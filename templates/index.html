@@ -274,7 +274,7 @@
                             <div class="card-body">
                                 <h5 class="card-title">Update #${entry["update-number"]} (Level ${entry["update-level"]})</h5>
                                 <p class="card-text"><strong>Description:</strong><br>${(entry.description || "").replace(/\n/g, "<br>")}</p>
-                                <div><strong>Related Issues:</strong><br>${renderBugFixes(entry["bug-fixes"])}</div>
+                                <div><strong>Related Issues:</strong><br>${renderRelatedIssues(entry["bug-fixes"])}</div>
                             </div>
                         `;
                         container.appendChild(card);
@@ -321,7 +321,7 @@
             
         }
 
-        function renderBugFixes(bugFixesRaw) {
+        function renderRelatedIssues(bugFixesRaw) {
             let urls = [];
             try {
                 urls = JSON.parse(bugFixesRaw);

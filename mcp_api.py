@@ -149,6 +149,11 @@ def get_wso2_token():
         logger.error(f"Token fetch failed: {e}")
         return None
 
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
 @app.route("/product-versions", methods=["GET"])
 def fetch_product_versions():
     token = get_wso2_token()
@@ -187,11 +192,6 @@ def fetch_product_versions():
     except Exception as e:
         logger.error(f"Products fetch failed: {e}")
         return jsonify({"error": "Failed to fetch products"}), 500
-
-
-@app.route("/")
-def home():
-    return render_template("index.html")
 
 @app.route("/chat", methods=["POST"])
 def chat_endpoint():
