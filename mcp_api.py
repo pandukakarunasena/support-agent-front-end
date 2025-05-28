@@ -1,35 +1,21 @@
 # Updated: api_server.py with log monitoring and specific error codes for chatbot frontend
 import os
 import uuid
+import requests
 import json
-import uvicorn
 import logging
-import sqlite3
-from typing import Optional, List, Dict, Any
+import logging.handlers
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel
+
 from dotenv import load_dotenv
 from openai import OpenAI
 from fastmcp_http.client import FastMCPHttpClient
 import logging.handlers
-
-
-import os
-import uuid
-import json
-import logging
-import sqlite3
-import requests
 from typing import Dict, List, Any
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 from openai import OpenAI
-from fastmcp_http.client import FastMCPHttpClient
-import logging.handlers
 from flask import render_template
 
 # ─────────────────────────────── CONFIG ───────────────────────────────
@@ -78,6 +64,15 @@ oai_tools = [
     for t in tools_list
 ]
 
+PRODUCT_REPO_MAP = {
+    "wso2is": "product-is",
+    "wso2is-km": "product-is",
+    "wso2mi": "product-micro-integrator",
+    "wso2ei": "product-ei",
+    "wso2am": "product-apim"
+}
+
+
 SYSTEM_MESSAGE = {
     "role": "system",
     "content": (
@@ -97,8 +92,6 @@ SYSTEM_MESSAGE = {
         "  \"wso2mi\": \"product-micro-integrator\",\n"
         "  \"wso2ei\": \"product-ei\",\n"
         "  \"wso2am\": \"product-apim\",\n"
-        "  \"product-is\": \"product-is\",\n"
-        "  \"wso2/product-is\": \"product-is\"\n"
         "}\n\n"
         "When the user describes a problem:\n"
         " 1. Decide which tool(s) to call. The priority should go to the u2_update_summary tool, and ask if the user needs to get GitHub issues. If the user says GitHub issues are needed, run the github_find_related_issues tool.\n"
@@ -171,57 +164,70 @@ def fetch_product_versions():
         response.raise_for_status()
         raw_data = response.json()  
         result = []
-        print(raw_data)
+        logger.info("raw_data: {raw_data}")
 
 
-        for i, product_entry in enumerate(raw_data):
+
+        for product_entry in raw_data:
+            
             product_name = product_entry.get("product-name")
+            product_name = product_name.lower()
+            if product_name not in PRODUCT_REPO_MAP:
+                continue  # Skip if not in the map
+
             update_levels = product_entry.get("product-update-levels", [])
 
             result.append({
                 "product": product_name,
-                "versions": []
+                "versions": [
+                    version_info.get("product-base-version")
+                    for version_info in update_levels
+                    if version_info.get("product-base-version")
+                ]
             })
-
-            for version_info in update_levels:
-                base_version = version_info.get("product-base-version")
-                if base_version:
-                    result[i]["versions"].append(base_version)
 
         return jsonify(result)
     except Exception as e:
         logger.error(f"Products fetch failed: {e}")
         return jsonify({"error": "Failed to fetch products"}), 500
+    
+
+from flask import make_response
 
 @app.route("/chat", methods=["POST"])
 def chat_endpoint():
     try:
         req = request.get_json()
-        cid = req.get("conversation_id") or str(uuid.uuid4())
+        cid = request.headers.get("X-Conversation-ID") or req.get("conversation_id") or str(uuid.uuid4())
         user_input = req.get("user_input", "").strip()
         product_name = req.get("product")
         product_version = req.get("version")
 
-        logger.info(f"User input: {user_input}, Product: {product_name}, Version: {product_version}")
+        logger.info(f"[{cid}] Received request – User input: {user_input}, Product: {product_name}, Version: {product_version}")
 
         if not user_input:
-            return jsonify({"error_code": "EMPTY_INPUT", "message": "Input is required"}), 400
+            logger.warning(f"[{cid}] Empty input received")
+            resp = make_response(jsonify({"error_code": "EMPTY_INPUT", "message": "Input is required"}), 400)
+            resp.headers["X-Conversation-ID"] = cid
+            return resp
 
         sess = sessions.setdefault(cid, Session(cid))
 
-        # Optional: Add product/version to session or history
         if product_name:
             sess.history.append({"role": "user", "content": f"[product={product_name}]"})
+            logger.info(f"[{cid}] Product added to session: {product_name}")
         if product_version:
             sess.history.append({"role": "user", "content": f"[version={product_version}]"})
+            logger.info(f"[{cid}] Version added to session: {product_version}")
 
-        sess = sessions.setdefault(cid, Session(cid))
         sess.history.append({"role": "user", "content": user_input})
+        logger.info(f"[{cid}] User input added to session history")
+
         chat_input = sess.history[1:]
 
-        # If resuming from tool call
         if sess.awaiting_decision and user_input.lower() in {"continue", "yes"}:
             sess.awaiting_decision = False
+            logger.info(f"[{cid}] Resuming from tool decision...")
             response = oai.responses.create(
                 model=MODEL,
                 instructions=SYSTEM_MESSAGE["content"],
@@ -229,14 +235,17 @@ def chat_endpoint():
                 tools=oai_tools,
                 tool_choice="auto",
             )
-            return jsonify({
+            logger.info(f"[{cid}] Tool response summary sent to user")
+            resp = make_response(jsonify({
                 "conversation_id": cid,
                 "message": response.output[0].content[0].text,
                 "needs_more": False,
                 "hits": None
-            })
+            }))
+            resp.headers["X-Conversation-ID"] = cid
+            return resp
 
-        # Normal flow
+        logger.info(f"[{cid}] Sending input to LLM")
         llm_resp = oai.responses.create(
             model=MODEL,
             instructions=SYSTEM_MESSAGE["content"],
@@ -244,17 +253,23 @@ def chat_endpoint():
             tools=oai_tools,
             tool_choice="auto",
         )
+        logger.info(f"[{cid}] Received response from LLM")
 
         tool_calls = [o for o in llm_resp.output if o.type == "function_call"]
         if tool_calls:
+            logger.info(f"[{cid}] Tool calls detected: {[call.name for call in tool_calls]}")
             for call in tool_calls:
                 args = json.loads(call.arguments or "{}")
                 tool_name = call.name
                 try:
+                    # Ensure the conversation ID is included in the tool call arguments
+                    args["cid"] = cid
+                    logger.info(f"[{cid}] Executing tool: {tool_name} with args: {args}")
                     result = mcp.call_tool(tool_name, args)
                     data = json.loads(result[0].text)
+                    logger.info(f"[{cid}] Tool execution successful: {tool_name}")
                 except Exception as e:
-                    logger.error(f"Tool call failed: {tool_name} – {e}")
+                    logger.error(f"[{cid}] Tool call failed: {tool_name} – {e}")
                     data = {"error": f"Tool `{tool_name}` failed", "error_code": "TOOL_CALL_ERROR"}
 
                 hits = data if isinstance(data, list) else [data]
@@ -262,36 +277,251 @@ def chat_endpoint():
                 sess.history.append({"role": "assistant", "content": json.dumps(sess.hits, separators=(",", ":"))})
 
             sess.awaiting_decision = True
-            return jsonify({
+            logger.info(f"[{cid}] Waiting for user decision to summarize tool output")
+            resp = make_response(jsonify({
                 "conversation_id": cid,
                 "message": "I found related entries. Reply with 'continue' to get a summary.",
                 "needs_more": True,
                 "hits": sess.hits
-            })
+            }))
+            resp.headers["X-Conversation-ID"] = cid
+            return resp
 
-        # No tool usage
         message_chunks = [o for o in llm_resp.output if o.type == "message"]
         assistant_reply = "".join(c.text for c in message_chunks[0].content)
         sess.history.append({"role": "assistant", "content": assistant_reply})
-        return jsonify({
+        logger.info(f"[{cid}] Sending direct reply to user")
+        resp = make_response(jsonify({
             "conversation_id": cid,
             "message": assistant_reply,
             "needs_more": False,
             "hits": None
-        })
+        }))
+        resp.headers["X-Conversation-ID"] = cid
+        return resp
 
     except Exception as e:
-        logger.exception("Chat processing failed")
-        return jsonify({
+        logger.exception(f"[{cid}] Chat processing failed")
+        resp = make_response(jsonify({
             "error_code": "CHAT_PROCESSING_ERROR",
             "message": "Sorry, something went wrong.",
             "conversation_id": req.get("conversation_id", "unknown"),
             "needs_more": False,
             "hits": None
-        }), 500
+        }), 500)
+        resp.headers["X-Conversation-ID"] = cid
+        return resp
+
+    
+# @app.route("/chat", methods=["POST"])
+# def chat_endpoint():
+#     try:
+#         req = request.get_json()
+#         cid = request.headers.get("X-Conversation-ID") or req.get("conversation_id") or str(uuid.uuid4())
+#         user_input = req.get("user_input", "").strip()
+#         product_name = req.get("product")
+#         product_version = req.get("version")
+
+#         logger.info(f"[{cid}] Received request – User input: {user_input}, Product: {product_name}, Version: {product_version}")
+
+#         if not user_input:
+#             logger.warning(f"[{cid}] Empty input received")
+#             return jsonify({"error_code": "EMPTY_INPUT", "message": "Input is required"}), 400
+
+#         sess = sessions.setdefault(cid, Session(cid))
+
+#         if product_name:
+#             sess.history.append({"role": "user", "content": f"[product={product_name}]"})
+#             logger.info(f"[{cid}] Product added to session: {product_name}")
+#         if product_version:
+#             sess.history.append({"role": "user", "content": f"[version={product_version}]"})
+#             logger.info(f"[{cid}] Version added to session: {product_version}")
+
+#         sess.history.append({"role": "user", "content": user_input})
+#         logger.info(f"[{cid}] User input added to session history")
+
+#         chat_input = sess.history[1:]
+
+#         # If resuming from tool call
+#         if sess.awaiting_decision and user_input.lower() in {"continue", "yes"}:
+#             sess.awaiting_decision = False
+#             logger.info(f"[{cid}] Resuming from tool decision...")
+#             response = oai.responses.create(
+#                 model=MODEL,
+#                 instructions=SYSTEM_MESSAGE["content"],
+#                 input=chat_input,
+#                 tools=oai_tools,
+#                 tool_choice="auto",
+#             )
+#             logger.info(f"[{cid}] Tool response summary sent to user")
+#             return jsonify({
+#                 "conversation_id": cid,
+#                 "message": response.output[0].content[0].text,
+#                 "needs_more": False,
+#                 "hits": None
+#             })
+
+#         # Normal flow
+#         logger.info(f"[{cid}] Sending input to LLM")
+#         llm_resp = oai.responses.create(
+#             model=MODEL,
+#             instructions=SYSTEM_MESSAGE["content"],
+#             input=chat_input,
+#             tools=oai_tools,
+#             tool_choice="auto",
+#         )
+#         logger.info(f"[{cid}] Received response from LLM")
+
+#         tool_calls = [o for o in llm_resp.output if o.type == "function_call"]
+#         if tool_calls:
+#             logger.info(f"[{cid}] Tool calls detected: {[call.name for call in tool_calls]}")
+#             for call in tool_calls:
+#                 args = json.loads(call.arguments or "{}")
+#                 tool_name = call.name
+#                 try:
+#                     logger.info(f"[{cid}] Executing tool: {tool_name} with args: {args}")
+#                     result = mcp.call_tool(tool_name, args)
+#                     data = json.loads(result[0].text)
+#                     logger.info(f"[{cid}] Tool execution successful: {tool_name}")
+#                 except Exception as e:
+#                     logger.error(f"[{cid}] Tool call failed: {tool_name} – {e}")
+#                     data = {"error": f"Tool `{tool_name}` failed", "error_code": "TOOL_CALL_ERROR"}
+
+#                 hits = data if isinstance(data, list) else [data]
+#                 sess.hits.append({"tool": tool_name, "results": hits})
+#                 sess.history.append({"role": "assistant", "content": json.dumps(sess.hits, separators=(",", ":"))})
+
+#             sess.awaiting_decision = True
+#             logger.info(f"[{cid}] Waiting for user decision to summarize tool output")
+#             return jsonify({
+#                 "conversation_id": cid,
+#                 "message": "I found related entries. Reply with 'continue' to get a summary.",
+#                 "needs_more": True,
+#                 "hits": sess.hits
+#             })
+
+#         # No tool usage
+#         message_chunks = [o for o in llm_resp.output if o.type == "message"]
+#         assistant_reply = "".join(c.text for c in message_chunks[0].content)
+#         sess.history.append({"role": "assistant", "content": assistant_reply})
+#         logger.info(f"[{cid}] Sending direct reply to user")
+#         return jsonify({
+#             "conversation_id": cid,
+#             "message": assistant_reply,
+#             "needs_more": False,
+#             "hits": None
+#         })
+
+#     except Exception as e:
+#         logger.exception(f"[{cid}] Chat processing failed")
+#         return jsonify({
+#             "error_code": "CHAT_PROCESSING_ERROR",
+#             "message": "Sorry, something went wrong.",
+#             "conversation_id": req.get("conversation_id", "unknown"),
+#             "needs_more": False,
+#             "hits": None
+#         }), 500
+
+
+# @app.route("/chat", methods=["POST"])
+# def chat_endpoint():
+#     try:
+#         req = request.get_json()
+#         cid = request.headers.get("X-Conversation-ID") or req.get("conversation_id") or str(uuid.uuid4())
+#         user_input = req.get("user_input", "").strip()
+#         product_name = req.get("product")
+#         product_version = req.get("version")
+
+#         logger.info(f"[{cid}] User input: {user_input}, Product: {product_name}, Version: {product_version}")
+
+#         if not user_input:
+#             return jsonify({"error_code": "EMPTY_INPUT", "message": "Input is required"}), 400
+
+#         sess = sessions.setdefault(cid, Session(cid))
+
+#         # Optional: Add product/version to session or history
+#         if product_name:
+#             sess.history.append({"role": "user", "content": f"[product={product_name}]"})
+#         if product_version:
+#             sess.history.append({"role": "user", "content": f"[version={product_version}]"})
+
+#         sess = sessions.setdefault(cid, Session(cid))
+#         sess.history.append({"role": "user", "content": user_input})
+#         chat_input = sess.history[1:]
+
+#         # If resuming from tool call
+#         if sess.awaiting_decision and user_input.lower() in {"continue", "yes"}:
+#             sess.awaiting_decision = False
+#             response = oai.responses.create(
+#                 model=MODEL,
+#                 instructions=SYSTEM_MESSAGE["content"],
+#                 input=chat_input,
+#                 tools=oai_tools,
+#                 tool_choice="auto",
+#             )
+#             return jsonify({
+#                 "conversation_id": cid,
+#                 "message": response.output[0].content[0].text,
+#                 "needs_more": False,
+#                 "hits": None
+#             })
+
+#         # Normal flow
+#         llm_resp = oai.responses.create(
+#             model=MODEL,
+#             instructions=SYSTEM_MESSAGE["content"],
+#             input=chat_input,
+#             tools=oai_tools,
+#             tool_choice="auto",
+#         )
+
+#         tool_calls = [o for o in llm_resp.output if o.type == "function_call"]
+#         if tool_calls:
+#             for call in tool_calls:
+#                 args = json.loads(call.arguments or "{}")
+#                 tool_name = call.name
+#                 try:
+#                     result = mcp.call_tool(tool_name, args)
+#                     data = json.loads(result[0].text)
+#                 except Exception as e:
+#                     logger.error(f"Tool call failed: {tool_name} – {e}")
+#                     data = {"error": f"Tool `{tool_name}` failed", "error_code": "TOOL_CALL_ERROR"}
+
+#                 hits = data if isinstance(data, list) else [data]
+#                 sess.hits.append({"tool": tool_name, "results": hits})
+#                 sess.history.append({"role": "assistant", "content": json.dumps(sess.hits, separators=(",", ":"))})
+
+#             sess.awaiting_decision = True
+#             return jsonify({
+#                 "conversation_id": cid,
+#                 "message": "I found related entries. Reply with 'continue' to get a summary.",
+#                 "needs_more": True,
+#                 "hits": sess.hits
+#             })
+
+#         # No tool usage
+#         message_chunks = [o for o in llm_resp.output if o.type == "message"]
+#         assistant_reply = "".join(c.text for c in message_chunks[0].content)
+#         sess.history.append({"role": "assistant", "content": assistant_reply})
+#         return jsonify({
+#             "conversation_id": cid,
+#             "message": assistant_reply,
+#             "needs_more": False,
+#             "hits": None
+#         })
+
+#     except Exception as e:
+#         logger.exception("Chat processing failed")
+#         return jsonify({
+#             "error_code": "CHAT_PROCESSING_ERROR",
+#             "message": "Sorry, something went wrong.",
+#             "conversation_id": req.get("conversation_id", "unknown"),
+#             "needs_more": False,
+#             "hits": None
+#         }), 500
 
 if __name__ == "__main__":
-    app.run(host="localhost", port=8000, debug=True)
+    app.run(host="0.0.0.0", port=8000, debug=True)
 
 
 # PRODUCT_REPO_MAP = {
@@ -530,7 +760,7 @@ if __name__ == "__main__":
 #             for m in sess.history[1:]
 #         ]
 
-#         logger.info(chat_input)
+#         logger.info(ch[{cid}] at_input)
             
 #         # 2) Handle "continue" after tool results
 #         if sess.awaiting_decision:
@@ -564,16 +794,16 @@ if __name__ == "__main__":
 #             tool_choice="auto",               # ← correct param
 #         )
 
-#         # logger.info(llm_resp)
+#         # logger.info(ll[{cid}] m_resp)
 #         msg = llm_resp.output
 
-#         logger.info(f"llm_output {msg}")
+#         logger.info(f"[{cid}] llm_output {msg}")
 #         tool_calls = [item for item in llm_resp.output if item.type == "tool_call"]
 
 #         # 5) Tool-calling branch (unchanged)
 #         if tool_calls:
 #             # Loop through each tool call directive
-#             logger.info(f"tool_calls: {tool_calls}")
+#             logger.info(f"[{cid}] tool_calls: {tool_calls}")
 #             for call in tool_calls:
 #                 args = json.loads(call.arguments or "{}")
 #                 tool_name = call.name

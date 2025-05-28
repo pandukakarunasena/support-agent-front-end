@@ -94,80 +94,111 @@
             `;
             input.value = "";
 
-            const res = await fetch("/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    conversation_id: conversationId,
-                    user_input: message,
-                    product: product,
-                    version: version
-                })
-            });
+            const typingBubble = document.createElement("div");
+            typingBubble.className = "chat-bubble bot";
+            typingBubble.innerHTML = `
+            <div class="bubble" id="typing-indicator">AI is typing</div>
+            `;
+            chatBox.appendChild(typingBubble);
+            chatBox.scrollTop = chatBox.scrollHeight;
 
-            const data = await res.json();
-            conversationId = data.conversation_id;
-            console.log("Received data:", data);
-            console.log("Received data hits:", data.hits);
-            if (data.hits && data.hits.length > 0) {
-                data.hits.forEach((hit, index) => {
-                    if (hit.tool == "u2_update_summary") {
-                        // Insert a placeholder div for rendering
-                        const toolDivId = `tool-result-${index}`;
-                        chatBox.innerHTML += `
-                            <div class="chat-bubble bot">
-                                <div class="bubble">
-                                    <div id="${toolDivId}"></div>
-                                </div>
-                            </div>
-                        `;
-                        // Delay rendering to ensure DOM is updated
-                        setTimeout(() => {
-                            renderToolResults({
-                                tool: hit.tool,
-                                results: hit.results
-                            }, toolDivId);
-                        }, 0);
-                    } else if (hit.tool == "github_find_related_issues") {
-                        // Insert a placeholder div for rendering
-                        const toolDivId = `tool-result-${index}`;
-                        chatBox.innerHTML += `
-                            <div class="chat-bubble bot">
-                                <div class="bubble">
-                                    <div id="${toolDivId}"></div>
-                                </div>
-                            </div>
-                        `;
-                        // Delay rendering to ensure DOM is updated
-                        setTimeout(() => {
-                            renderToolResults({
-                                tool: hit.tool,
-                                results: hit.results
-                            }, toolDivId);
-                        }, 0);
-                    } else {
-                        chatBox.innerHTML += `
-                            <div class="chat-bubble bot">
-                                <div class="bubble"><pre style="white-space: pre-wrap;">${JSON.stringify(hit, null, 2)}</pre></div>
-                            </div>
-                        `;
-                    }
+            let dots = 0;
+            const interval = setInterval(() => {
+            dots = (dots + 1) % 4;
+            document.getElementById("typing-indicator").textContent =
+                "AI is typing" + ".".repeat(dots);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            }, 500);
+            try {
+                const res = await fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Conversation-ID": conversationId || ""
+                    },
+                    body: JSON.stringify({
+                        conversation_id: conversationId,
+                        user_input: message,
+                        product: product,
+                        version: version
+                    })
                 });
-            } else {
-                console.log("No hits found in response data.");
+
+                const data = await res.json();
+                conversationId = data.conversation_id;
+
+                clearInterval(interval);
+                typingBubble.remove();
+
+                if (data.hits && data.hits.length > 0) {
+                    data.hits.forEach((hit, index) => {
+                        if (hit.tool == "u2_update_summary") {
+                            // Insert a placeholder div for rendering
+                            const toolDivId = `tool-result-${index}`;
+                            chatBox.innerHTML += `
+                                <div class="chat-bubble bot">
+                                    <div class="bubble">
+                                        <div id="${toolDivId}"></div>
+                                    </div>
+                                </div>
+                            `;
+                            // Delay rendering to ensure DOM is updated
+                            setTimeout(() => {
+                                renderToolResults({
+                                    tool: hit.tool,
+                                    results: hit.results
+                                }, toolDivId);
+                            }, 0);
+                        } else if (hit.tool == "github_find_related_issues") {
+                            // Insert a placeholder div for rendering
+                            const toolDivId = `tool-result-${index}`;
+                            chatBox.innerHTML += `
+                                <div class="chat-bubble bot">
+                                    <div class="bubble">
+                                        <div id="${toolDivId}"></div>
+                                    </div>
+                                </div>
+                            `;
+                            // Delay rendering to ensure DOM is updated
+                            setTimeout(() => {
+                                renderToolResults({
+                                    tool: hit.tool,
+                                    results: hit.results
+                                }, toolDivId);
+                            }, 0);
+                        } else {
+                            chatBox.innerHTML += `
+                                <div class="chat-bubble bot">
+                                    <div class="bubble"><pre style="white-space: pre-wrap;">${JSON.stringify(hit, null, 2)}</pre></div>
+                                </div>
+                            `;
+                        }
+                    });
+                } else {
+                    console.log("No hits found in response data.");
+                    chatBox.innerHTML += `
+                                <div class="chat-bubble bot">
+                                    <div class="bubble"><pre style="white-space: pre-wrap;">${data.message}</pre></div>
+                                </div>
+                            `;
+                }
+            } catch (err) {
+                clearInterval(interval);
+                typingBubble.remove();
                 chatBox.innerHTML += `
-                            <div class="chat-bubble bot">
-                                <div class="bubble"><pre style="white-space: pre-wrap;">${data.message}</pre></div>
-                            </div>
-                        `;
+                    <div class="chat-bubble bot">
+                    <div class="bubble text-danger">Oops, something went wrong.</div>
+                    </div>
+                `;
+                console.error(err);
             }
+            
 
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        async function startNewChat() {
-            conversationId = null;
-            document.getElementById("chat-box").innerHTML = "";
+        function startNewChat() {
+            const newWindow = window.open("/", "_blank");
         }
 
         let productVersionMap = {};
