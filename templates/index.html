@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <title>AI Chat Assistant</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- GitHub-style CSS (optional but makes it look familiar) -->
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css"/>
+
+    <!-- marked (Markdown → HTML) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify (sanitize the resulting HTML) -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
     <style>
         body {
             background-color: #f7f7f7;
@@ -37,6 +45,21 @@
         .chat-input {
             display: flex;
             gap: 10px;
+        }
+
+        .markdown-body {
+            color-scheme: light;
+        }
+
+        /* Option B: target dark-mode variables directly */
+        @media (prefers-color-scheme: dark) {
+            .markdown-body {
+                --color-canvas-default: #fff !important;
+                --color-canvas-subtle:  #f6f8fa !important;
+                --color-fg-default:      #24292e !important;
+                --color-fg-muted:        #6e7681 !important;
+                --color-fg-subtle:       #6e7681 !important;
+            }
         }
     </style>
 </head>
@@ -132,24 +155,7 @@
 
                 if (data.hits && data.hits.length > 0) {
                     data.hits.forEach((hit, index) => {
-                        if (hit.tool == "u2_update_summary") {
-                            // Insert a placeholder div for rendering
-                            const toolDivId = `tool-result-${index}`;
-                            chatBox.innerHTML += `
-                                <div class="chat-bubble bot">
-                                    <div class="bubble">
-                                        <div id="${toolDivId}"></div>
-                                    </div>
-                                </div>
-                            `;
-                            // Delay rendering to ensure DOM is updated
-                            setTimeout(() => {
-                                renderToolResults({
-                                    tool: hit.tool,
-                                    results: hit.results
-                                }, toolDivId);
-                            }, 0);
-                        } else if (hit.tool == "github_find_related_issues") {
+                        if (hit.tool && hit.results) {
                             // Insert a placeholder div for rendering
                             const toolDivId = `tool-result-${index}`;
                             chatBox.innerHTML += `
@@ -176,9 +182,12 @@
                     });
                 } else {
                     console.log("No hits found in response data.");
+                    const messageDivId = "message-div";
                     chatBox.innerHTML += `
                                 <div class="chat-bubble bot">
-                                    <div class="bubble"><pre style="white-space: pre-wrap;">${data.message}</pre></div>
+                                    <div class="bubble">
+                                        <div class="${messageDivId}">${renderMarkdownContent(data.message, messageDivId)}</div>
+                                    </div>
                                 </div>
                             `;
                 }
@@ -245,37 +254,6 @@
 
         document.addEventListener("DOMContentLoaded", loadProductVersions);
 
-        // function renderToolResults(responseData) {
-        //     console.log("tool data " + responseData);
-        //     const container = document.getElementById("tool-results");
-        //     container.innerHTML = ""; // Clear previous
-
-        //     if (!responseData.tool || !Array.isArray(responseData.results)) {
-        //         container.innerHTML = "<p class='text-danger'>No tool data available.</p>";
-        //         return;
-        //     }
-
-        //     const toolName = responseData.tool;
-        //     const results = responseData.results;
-
-        //     const toolHeader = document.createElement("h4");
-        //     toolHeader.textContent = `Tool: ${toolName}`;
-        //     container.appendChild(toolHeader);
-
-        //     results.forEach((entry, index) => {
-        //         const card = document.createElement("div");
-        //         card.className = "card mb-3";
-        //         card.innerHTML = `
-        //             <div class="card-body">
-        //                 <h5 class="card-title">Update #${entry["update-number"]} (Level ${entry["update-level"]})</h5>
-        //                 <p class="card-text"><strong>Description:</strong><br>${entry.description?.replace(/\n/g, "<br>") || "N/A"}</p>
-        //                 <div><strong>Bug Fixes:</strong><br>${renderBugFixes(entry["bug-fixes"])}</div>
-        //             </div>
-        //         `;
-        //         container.appendChild(card);
-        //     });
-        // }
-
         function renderToolResults(responseData, containerId) {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -321,22 +299,25 @@
                 toolHeader.textContent = `Tool: ${toolName}`;
                 container.appendChild(toolHeader);
 
-                results.forEach((issue) => {
+                results.forEach((issue, idx) => {
                     if (!issue.error) {
                         console.log(issue);
                         const card = document.createElement("div");
                         card.className = "card mb-3";
                         card.innerHTML = `
                             <div class="card-body">
-                                <h5 class="card-title">
-                                    <a href="${issue.url}" target="_blank">${issue.title}</a>
-                                </h5>
-                                <p class="card-text">
-                                    ${issue.body ? issue.body.substring(0, 300).replace(/\n/g, "<br>") + "..." : "No description."}
-                                </p>
+                            <h5 class="card-title">
+                                <a href="${issue.url}" target="_blank">${issue.title}</a>
+                            </h5>
+                            <!-- this div will host the rendered Markdown -->
+                            <div id="issue-body-${containerId}-${idx}" class="markdown-body"></div>
                             </div>
                         `;
                         container.appendChild(card);
+
+                        // Now render the issue.body as GitHub-flavored Markdown
+                        const mdContainer = document.getElementById(`issue-body-${containerId}-${idx}`);
+                        renderMarkdownContent(issue.body, mdContainer);
                     } else {
                         const errorDiv = document.createElement("div");
                         errorDiv.className = "alert alert-danger";
@@ -367,23 +348,13 @@
             return urls.map(url => `<a href="${url}" target="_blank">${url}</a>`).join("<br>");
         }
 
-
-        // function renderBugFixes(bugFixesRaw) {
-        //     try {
-        //         const links = JSON.parse(bugFixesRaw);
-        //         if (!Array.isArray(links) || links.length === 0) return "None";
-
-        //         return links.map(url =>
-        //             `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
-        //         ).join("<br>");
-        //     } catch {
-        //         return "Invalid bug fix data";
-        //     }
-        // }
-
-// Example usage:
-// renderToolResults(responseData);
-
+        function renderMarkdownContent(content, containerId) {
+            const dirtyHtml = marked.parse(content || "", {
+                gfm: true,
+                breaks: true
+            });
+            return DOMPurify.sanitize(dirtyHtml);    
+        }
 
     </script>
 </body>
