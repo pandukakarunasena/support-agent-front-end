@@ -164,7 +164,7 @@ def fetch_product_versions():
         response.raise_for_status()
         raw_data = response.json()  
         result = []
-        logger.info("raw_data: {raw_data}")
+        logger.info(f"[INIT] raw_data: {raw_data}")
 
 
 
