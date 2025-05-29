@@ -3,6 +3,7 @@ docker run -d \
   -p 9999:9999 \
   u2-git-mcp-server:latest
 
+docker network create mynet
 
 docker run --rm -it \
   --name mcp_client \
