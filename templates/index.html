@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Chat Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f7f7f7;
+        }
+        .chat-box {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #fff;
+        }
+        .chat-bubble.user {
+            text-align: right;
+        }
+        .chat-bubble.user .bubble {
+            background-color: #0d6efd;
+            color: white;
+            display: inline-block;
+            padding: 10px;
+            border-radius: 15px;
+            margin-bottom: 5px;
+        }
+        .chat-bubble.bot .bubble {
+            background-color: #e9ecef;
+            display: inline-block;
+            padding: 10px;
+            border-radius: 15px;
+            margin-bottom: 5px;
+        }
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="mb-3">
+            <label for="product-select" class="form-label">Select Product</label>
+            <select class="form-select" id="product-select" disabled>
+                <option selected>Loading...</option>
+            </select>
+        
+            <label for="version-select" class="form-label mt-2">Select Version</label>
+            <select class="form-select" id="version-select">
+                <option selected>Select a product first</option>
+            </select>
+        </div>
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0">AI Chat Assistant</h3>
+            <button class="btn btn-sm btn-outline-secondary" onclick="startNewChat()">New Chat</button>
+        </div>
+        <div class="chat-box mb-3" id="chat-box"></div>
+        <div class="chat-input">
+            <input type="text" id="message" class="form-control" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendMessage()">
+            <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let conversationId = null;
+
+        async function sendMessage() {
+
+            const product = document.getElementById("product-select").value;
+            console.log("Selected product:", product);
+            
+            const version = document.getElementById("version-select").value;
+            console.log("Selected version:", version);
+           
+            if (!product || product == "Select a product" || !version || version == "Select a version") {
+                alert("Please select a product and version before sending a message.");
+                return;
+            }
+
+            const input = document.getElementById("message");
+            const chatBox = document.getElementById("chat-box");
+            const message = input.value.trim();
+            if (!message) {
+                alert("Message Cannot be empty.");
+                return;
+            };
+
+            chatBox.innerHTML += `
+                <div class="chat-bubble user"><div class="bubble">${message}</div></div>
+            `;
+            input.value = "";
+
+            const typingBubble = document.createElement("div");
+            typingBubble.className = "chat-bubble bot";
+            typingBubble.innerHTML = `
+            <div class="bubble" id="typing-indicator">AI is typing</div>
+            `;
+            chatBox.appendChild(typingBubble);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            let dots = 0;
+            const interval = setInterval(() => {
+            dots = (dots + 1) % 4;
+            document.getElementById("typing-indicator").textContent =
+                "AI is typing" + ".".repeat(dots);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            }, 500);
+            try {
+                const res = await fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Conversation-ID": conversationId || ""
+                    },
+                    body: JSON.stringify({
+                        conversation_id: conversationId,
+                        user_input: message,
+                        product: product,
+                        version: version
+                    })
+                });
+
+                const data = await res.json();
+                conversationId = data.conversation_id;
+
+                clearInterval(interval);
+                typingBubble.remove();
+
+                if (data.hits && data.hits.length > 0) {
+                    data.hits.forEach((hit, index) => {
+                        if (hit.tool == "u2_update_summary") {
+                            // Insert a placeholder div for rendering
+                            const toolDivId = `tool-result-${index}`;
+                            chatBox.innerHTML += `
+                                <div class="chat-bubble bot">
+                                    <div class="bubble">
+                                        <div id="${toolDivId}"></div>
+                                    </div>
+                                </div>
+                            `;
+                            // Delay rendering to ensure DOM is updated
+                            setTimeout(() => {
+                                renderToolResults({
+                                    tool: hit.tool,
+                                    results: hit.results
+                                }, toolDivId);
+                            }, 0);
+                        } else if (hit.tool == "github_find_related_issues") {
+                            // Insert a placeholder div for rendering
+                            const toolDivId = `tool-result-${index}`;
+                            chatBox.innerHTML += `
+                                <div class="chat-bubble bot">
+                                    <div class="bubble">
+                                        <div id="${toolDivId}"></div>
+                                    </div>
+                                </div>
+                            `;
+                            // Delay rendering to ensure DOM is updated
+                            setTimeout(() => {
+                                renderToolResults({
+                                    tool: hit.tool,
+                                    results: hit.results
+                                }, toolDivId);
+                            }, 0);
+                        } else {
+                            chatBox.innerHTML += `
+                                <div class="chat-bubble bot">
+                                    <div class="bubble"><pre style="white-space: pre-wrap;">${JSON.stringify(hit, null, 2)}</pre></div>
+                                </div>
+                            `;
+                        }
+                    });
+                } else {
+                    console.log("No hits found in response data.");
+                    chatBox.innerHTML += `
+                                <div class="chat-bubble bot">
+                                    <div class="bubble"><pre style="white-space: pre-wrap;">${data.message}</pre></div>
+                                </div>
+                            `;
+                }
+            } catch (err) {
+                clearInterval(interval);
+                typingBubble.remove();
+                chatBox.innerHTML += `
+                    <div class="chat-bubble bot">
+                    <div class="bubble text-danger">Oops, something went wrong.</div>
+                    </div>
+                `;
+                console.error(err);
+            }
+            
+
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function startNewChat() {
+            const newWindow = window.open("/", "_blank");
+        }
+
+        let productVersionMap = {};
+
+        async function loadProductVersions() {
+            const res = await fetch("/product-versions");
+            const data = await res.json();
+
+            console.log("Received data:", data);
+
+            const productSelect = document.getElementById("product-select");
+            const versionSelect = document.getElementById("version-select");
+
+            productSelect.innerHTML = '<option selected disabled>Select a product</option>';
+            versionSelect.innerHTML = '<option selected disabled>Select a version</option>';
+            productSelect.disabled = false;
+
+            const productVersionMap = {};
+
+            // Build dropdown and lookup map
+            data.forEach(entry => {
+                productVersionMap[entry.product] = entry.versions;
+
+                const opt = document.createElement("option");
+                opt.value = entry.product;
+                opt.textContent = entry.product;
+                productSelect.appendChild(opt);
+            });
+
+            // Handle product selection to update versions
+            productSelect.addEventListener("change", () => {
+                const selectedProduct = productSelect.value;
+                const versions = productVersionMap[selectedProduct] || [];
+
+                versionSelect.innerHTML = '<option selected disabled>Select a version</option>';
+                versions.forEach(version => {
+                    const opt = document.createElement("option");
+                    opt.value = version;
+                    opt.textContent = version;
+                    versionSelect.appendChild(opt);
+                });
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", loadProductVersions);
+
+        // function renderToolResults(responseData) {
+        //     console.log("tool data " + responseData);
+        //     const container = document.getElementById("tool-results");
+        //     container.innerHTML = ""; // Clear previous
+
+        //     if (!responseData.tool || !Array.isArray(responseData.results)) {
+        //         container.innerHTML = "<p class='text-danger'>No tool data available.</p>";
+        //         return;
+        //     }
+
+        //     const toolName = responseData.tool;
+        //     const results = responseData.results;
+
+        //     const toolHeader = document.createElement("h4");
+        //     toolHeader.textContent = `Tool: ${toolName}`;
+        //     container.appendChild(toolHeader);
+
+        //     results.forEach((entry, index) => {
+        //         const card = document.createElement("div");
+        //         card.className = "card mb-3";
+        //         card.innerHTML = `
+        //             <div class="card-body">
+        //                 <h5 class="card-title">Update #${entry["update-number"]} (Level ${entry["update-level"]})</h5>
+        //                 <p class="card-text"><strong>Description:</strong><br>${entry.description?.replace(/\n/g, "<br>") || "N/A"}</p>
+        //                 <div><strong>Bug Fixes:</strong><br>${renderBugFixes(entry["bug-fixes"])}</div>
+        //             </div>
+        //         `;
+        //         container.appendChild(card);
+        //     });
+        // }
+
+        function renderToolResults(responseData, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            container.innerHTML = ""; // Clear previous content
+
+            if (!responseData.tool || !Array.isArray(responseData.results)) {
+                container.innerHTML = "<p class='text-danger'>No tool data available.</p>";
+                return;
+            }
+
+            const toolName = responseData.tool;
+            const results = responseData.results;
+
+            if (toolName == "u2_update_summary") {
+                const toolHeader = document.createElement("h4");
+                toolHeader.textContent = `Tool: ${toolName}`;
+                container.appendChild(toolHeader);
+
+                results.forEach((entry, index) => {
+                    console.log("Rendering entry:", entry);
+
+                    if (!entry.error) {
+                        const card = document.createElement("div");
+                        card.className = "card mb-3";
+                        card.innerHTML = `
+                            <div class="card-body">
+                                <h5 class="card-title">Update #${entry["update-number"]} (Level ${entry["update-level"]})</h5>
+                                <p class="card-text"><strong>Description:</strong><br>${(entry.description || "").replace(/\n/g, "<br>")}</p>
+                                <div><strong>Related Issues:</strong><br>${renderRelatedIssues(entry["bug-fixes"])}</div>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    } else {
+                        const errorDiv = document.createElement("div");
+                        errorDiv.className = "alert alert-danger";
+                        errorDiv.textContent = `Error occured while searching Update Summary`;
+                        container.appendChild(errorDiv);
+                    }
+                });
+            } else if (toolName == "github_find_related_issues") {
+                const toolHeader = document.createElement("h4");
+                toolHeader.textContent = `Tool: ${toolName}`;
+                container.appendChild(toolHeader);
+
+                results.forEach((issue) => {
+                    if (!issue.error) {
+                        console.log(issue);
+                        const card = document.createElement("div");
+                        card.className = "card mb-3";
+                        card.innerHTML = `
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <a href="${issue.url}" target="_blank">${issue.title}</a>
+                                </h5>
+                                <p class="card-text">
+                                    ${issue.body ? issue.body.substring(0, 300).replace(/\n/g, "<br>") + "..." : "No description."}
+                                </p>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    } else {
+                        const errorDiv = document.createElement("div");
+                        errorDiv.className = "alert alert-danger";
+                        errorDiv.textContent = `Error occurred while fetching GitHub issues.`;
+                        container.appendChild(errorDiv);
+                    }
+                });
+            
+            } else {
+                container.innerHTML = `<h4>${toolName}</h4>`;
+            }
+
+            
+        }
+
+        function renderRelatedIssues(bugFixesRaw) {
+            let urls = [];
+            try {
+                urls = JSON.parse(bugFixesRaw);
+            } catch (e) {
+                return "No valid bug fix URLs.";
+            }
+
+            if (!Array.isArray(urls) || urls.length === 0) {
+                return "No bug fixes listed.";
+            }
+
+            return urls.map(url => `<a href="${url}" target="_blank">${url}</a>`).join("<br>");
+        }
+
+
+        // function renderBugFixes(bugFixesRaw) {
+        //     try {
+        //         const links = JSON.parse(bugFixesRaw);
+        //         if (!Array.isArray(links) || links.length === 0) return "None";
+
+        //         return links.map(url =>
+        //             `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
+        //         ).join("<br>");
+        //     } catch {
+        //         return "Invalid bug fix data";
+        //     }
+        // }
+
+// Example usage:
+// renderToolResults(responseData);
+
+
+    </script>
+</body>
+</html>
