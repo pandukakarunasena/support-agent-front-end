@@ -1,0 +1,53 @@
+# ── Source control ─────────────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ── Docker config ─────────────────────────────────────────────────────────
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# ── Python bytecode & caches ───────────────────────────────────────────────
+**/__pycache__/
+**/*.py[cod]
+*$py.class
+
+# ── Virtual environments (uv default .venv plus common names) ─────────────
+.venv/
+venv/
+env/
+env.bak/
+
+# ── Distribution/build artifacts ──────────────────────────────────────────
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+
+# ── Logs & temp files ─────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+
+# ── Test & coverage ───────────────────────────────────────────────────────
+.coverage
+.coverage.*
+.pytest_cache/
+.tox/
+.nox/
+
+# ── Editor/project settings ───────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+
+# ── dotenv files ──────────────────────────────────────────────────────────
+.env
+.env.*.local
+
+# ── Documentation builds ─────────────────────────────────────────────────
+docs/_build/
