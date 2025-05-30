@@ -186,7 +186,7 @@
                     chatBox.innerHTML += `
                                 <div class="chat-bubble bot">
                                     <div class="bubble">
-                                        <div class="${messageDivId}">${renderMarkdownContent(data.message, messageDivId)}</div>
+                                        <div class="${messageDivId}">${renderMarkdownContent(data.message)}</div>
                                     </div>
                                 </div>
                             `;
@@ -310,14 +310,13 @@
                                 <a href="${issue.url}" target="_blank">${issue.title}</a>
                             </h5>
                             <!-- this div will host the rendered Markdown -->
-                            <div id="issue-body-${containerId}-${idx}" class="markdown-body"></div>
+                            <div id="issue-body-${containerId}-${idx}" class="markdown-body">${renderMarkdownContent(issue.body)}                            </div>
                             </div>
                         `;
                         container.appendChild(card);
 
                         // Now render the issue.body as GitHub-flavored Markdown
-                        const mdContainer = document.getElementById(`issue-body-${containerId}-${idx}`);
-                        renderMarkdownContent(issue.body, mdContainer);
+                        // const mdContainer = document.getElementById(`issue-body-${containerId}-${idx}`);
                     } else {
                         const errorDiv = document.createElement("div");
                         errorDiv.className = "alert alert-danger";
@@ -348,7 +347,7 @@
             return urls.map(url => `<a href="${url}" target="_blank">${url}</a>`).join("<br>");
         }
 
-        function renderMarkdownContent(content, containerId) {
+        function renderMarkdownContent(content) {
             const dirtyHtml = marked.parse(content || "", {
                 gfm: true,
                 breaks: true
