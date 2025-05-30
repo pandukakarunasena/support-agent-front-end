@@ -1,6 +1,6 @@
 .env
 .pypirc
-logs
+logs/
 dist
 mcp_server.egg-info
 .venv
