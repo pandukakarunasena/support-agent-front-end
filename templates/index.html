@@ -154,6 +154,12 @@
                 typingBubble.remove();
 
                 if (data.hits && data.hits.length > 0) {
+
+                    chatBox.innerHTML += `
+                                <div class="chat-bubble bot">
+                                    <div class="bubble"><pre style="white-space: pre-wrap;">${data.message}</pre></div>
+                                </div>
+                            `;
                     data.hits.forEach((hit, index) => {
                         if (hit.tool && hit.results) {
                             // Insert a placeholder div for rendering

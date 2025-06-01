@@ -276,16 +276,16 @@ def chat_endpoint():
                 sess.hits.append({"tool": tool_name, "results": hits})
                 sess.history.append({"role": "assistant", "content": json.dumps(sess.hits, separators=(",", ":"))})
 
-            sess.awaiting_decision = True
-            logger.info(f"[{cid}] Waiting for user decision to summarize tool output")
-            resp = make_response(jsonify({
-                "conversation_id": cid,
-                "message": "I found related entries. Reply with 'continue' to get a summary.",
-                "needs_more": True,
-                "hits": sess.hits
-            }))
-            resp.headers["X-Conversation-ID"] = cid
-            return resp
+                sess.awaiting_decision = True
+                logger.info(f"[{cid}] Waiting for user decision to summarize tool output")
+                resp = make_response(jsonify({
+                    "conversation_id": cid,
+                    "message": "Below Entries have been found from U2 and Github. You can get a summary by typing 'continue' or 'yes'.",
+                    "needs_more": True,
+                    "hits": sess.hits
+                }))
+                resp.headers["X-Conversation-ID"] = cid
+                return resp
 
         message_chunks = [o for o in llm_resp.output if o.type == "message"]
         assistant_reply = "".join(c.text for c in message_chunks[0].content)
