@@ -17,6 +17,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from openai import OpenAI
 from flask import render_template
+from flask import make_response
 
 # ─────────────────────────────── CONFIG ───────────────────────────────
 
@@ -137,12 +138,11 @@ def get_wso2_token():
 
     # Log what we’re about to send (but omit the secret itself)
     logger.info(
-        "POSTing to %s\n  data=%s\n  headers-Accept=%s\n headers-User-Agent=%s\n  auth=(%s, ****)",
-        url,
-        data,
-        headers["Accept"],
-        headers["User-Agent"],
-        WSO2_CLIENT_ID
+        f"POSTing to {url}\n"
+        f"  data={data}\n"
+        f"  headers-Accept={headers['Accept']}\n"
+        f"  headers-User-Agent={headers['User-Agent']}\n"
+        f"  auth=({WSO2_CLIENT_ID}, ****)"
     )
 
     try:
@@ -153,20 +153,16 @@ def get_wso2_token():
             headers=headers
         )
 
-        logger.info(
-            "Response from %s → status=%s\n  body=%s",
-            url,
-            response.status_code,
-            response.text
-        )
+        logger.info(f"Response from {url} → status={response.status_code}\n")
 
         response.raise_for_status()
         token = response.json().get("access_token")
-        logger.info("Access token received: %s", token[:10] )
+        logger.info(f"Access token received: {token[:10]}")
         return token
     except Exception as e:
-        logger.error("Failed to send request to %s: %s", url, e)
+        logger.error(f"Failed to send request to {url}: {e}")
         return None
+
 
 
 @app.route("/")
@@ -189,30 +185,26 @@ def fetch_product_versions():
         }
 
         logger.info(
-            "POSTing to %s\n headers-Accept=%s\n headers-User-Agent=%s\n headers-Content-Type=%s\n  auth=(%s, ****)",
-            WSO2_UPDATE_API,
-            headers["Accept"],
-            headers["User-Agent"],
-            headers["Content-Type"],
-            WSO2_CLIENT_ID
+            f"POSTing to {WSO2_UPDATE_API}\n"
+            f"  headers-Accept={headers['Accept']}\n"
+            f"  headers-User-Agent={headers['User-Agent']}\n"
+            f"  headers-Content-Type={headers['Content-Type']}\n"
+            f"  auth=({WSO2_CLIENT_ID}, ****)"
         )
 
         response = requests.get(WSO2_UPDATE_API, headers=headers)
 
         logger.info(
-            "Response from %s → status=%s\n  body=%s",
-            WSO2_UPDATE_API,
-            response.status_code,
-            response.text
+            f"Response from {WSO2_UPDATE_API} → status={response.status_code}\n"
+            f"  body={response.text}"
         )
 
         response.raise_for_status()
-        raw_data = response.json()  
+        raw_data = response.json()
         result = []
         logger.info(f"[INIT] raw_data: {raw_data}")
 
         for product_entry in raw_data:
-            
             product_name = product_entry.get("product-name")
             product_name = product_name.lower()
             if product_name not in PRODUCT_REPO_MAP:
@@ -231,12 +223,9 @@ def fetch_product_versions():
 
         return jsonify(result)
     except Exception as e:
-        logger.error("Products fetch failed: ", e)
+        logger.error(f"Products fetch failed: {e}")
         return jsonify({"error": "Failed to fetch products"}), 500
     
-
-from flask import make_response
-
 @app.route("/chat", methods=["POST"])
 def chat_endpoint():
     try:
