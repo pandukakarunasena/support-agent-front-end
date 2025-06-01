@@ -133,7 +133,7 @@
             chatBox.scrollTop = chatBox.scrollHeight;
             }, 500);
             try {
-                const res = await fetch("/chat", {
+                const res = await fetch("./chat", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -219,7 +219,7 @@
         let productVersionMap = {};
 
         async function loadProductVersions() {
-            const res = await fetch("/product-versions");
+            const res = await fetch("./product-versions");
             const data = await res.json();
 
             console.log("Received data:", data);
