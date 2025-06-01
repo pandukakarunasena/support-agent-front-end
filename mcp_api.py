@@ -196,13 +196,13 @@ def fetch_product_versions():
 
         logger.info(
             f"Response from {WSO2_UPDATE_API} → status={response.status_code}\n"
-            f"  body={response.text}"
+            f"  body={response.text[:100]}"
         )
 
         response.raise_for_status()
         raw_data = response.json()
         result = []
-        logger.info(f"[INIT] raw_data: {raw_data}")
+        logger.info(f"[INIT] raw_data: {raw_data[:100]}")
 
         for product_entry in raw_data:
             product_name = product_entry.get("product-name")
