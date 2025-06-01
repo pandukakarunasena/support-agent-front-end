@@ -180,8 +180,8 @@ def fetch_product_versions():
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/x-www-form-urlencoded",
             "Accept": "application/json",
-            # "User-Agent": "PostmanRuntime/7.42.0"
-            "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
+            "User-Agent": "PostmanRuntime/7.42.0"
+            # "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
         }
 
         logger.info(
