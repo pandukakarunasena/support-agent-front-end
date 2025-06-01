@@ -165,7 +165,7 @@ def get_wso2_token():
         return token
     except Exception as e:
         logger.error("Failed to send request to %s: %s", url, e)
-        raise
+        return None
 
 
 @app.route("/")
