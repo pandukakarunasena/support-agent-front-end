@@ -12,3 +12,13 @@ docker run --rm -it \
   -p 8000:8000 \
   -v "$(pwd)/logs":/app/logs \
     support-agent:latest
+
+
+
+docker run --rm -it \
+  --name mcp_client \
+  --env-file .env.run \
+  -p 8000:8000 \
+  -v "$(pwd)/logs":/app/logs \
+
+

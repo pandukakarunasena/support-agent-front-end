@@ -193,7 +193,7 @@ def fetch_product_versions():
             WSO2_UPDATE_API,
             headers["Accept"],
             headers["User-Agent"],
-            headers["Content-Typet"],
+            headers["Content-Type"],
             WSO2_CLIENT_ID
         )
 
@@ -231,7 +231,7 @@ def fetch_product_versions():
 
         return jsonify(result)
     except Exception as e:
-        logger.error(f"Products fetch failed: {e}")
+        logger.error("Products fetch failed: ", e)
         return jsonify({"error": "Failed to fetch products"}), 500
     
 
