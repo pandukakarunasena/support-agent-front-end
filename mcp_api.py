@@ -39,9 +39,9 @@ OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 MODEL = "gpt-4o"
 
 if os.getenv("ENVIRONMENT") == "development-choreo":
-    MCP_SERVER_URL = f"http://{os.getenv('MCP_SERVER_HOST', 'localhost')}"
-
-MCP_SERVER_URL = f"http://{os.getenv('MCP_SERVER_HOST', 'localhost')}:{os.getenv('MCP_SERVER_PORT', '9999')}"
+    MCP_SERVER_URL = f"{os.getenv('MCP_SERVER_HOST', 'localhost')}"
+else:
+    MCP_SERVER_URL = f"http://{os.getenv('MCP_SERVER_HOST', 'localhost')}:{os.getenv('MCP_SERVER_PORT', '9999')}"
 
 if not OPENAI_KEY:
     raise RuntimeError("Missing OPENAI_API_KEY in environment")
