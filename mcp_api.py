@@ -137,10 +137,11 @@ def get_wso2_token():
 
     # Log what we’re about to send (but omit the secret itself)
     logger.info(
-        "POSTing to %s\n  data=%s\n  headers=%s\n  auth=(%s, ****)",
+        "POSTing to %s\n  data=%s\n  headers-Accept=%s\n headers-User-Agent=%s\n  auth=(%s, ****)",
         url,
         data,
-        headers,
+        headers["Accept"],
+        headers["User-Agent"],
         WSO2_CLIENT_ID
     )
 
@@ -184,15 +185,18 @@ def fetch_product_versions():
             "Content-Type": "application/x-www-form-urlencoded",
             "Accept": "application/json",
             # "User-Agent": "PostmanRuntime/7.42.0"
-            "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2"
+            "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
         }
 
         logger.info(
-            "POSTing to %s\n headers=%s\n  auth=(%s, ****)",
+            "POSTing to %s\n headers-Accept=%s\n headers-User-Agent=%s\n headers-Content-Type=%s\n  auth=(%s, ****)",
             WSO2_UPDATE_API,
-            headers,
+            headers["Accept"],
+            headers["User-Agent"],
+            headers["Content-Typet"],
             WSO2_CLIENT_ID
         )
+
         response = requests.get(WSO2_UPDATE_API, headers=headers)
 
         logger.info(
