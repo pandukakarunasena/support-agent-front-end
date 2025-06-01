@@ -4,6 +4,7 @@ FROM python:3.10-slim AS builder
 WORKDIR /app
 
 # Install Python dependencies into user site
+RUN apt-get update && apt-get install -y python3 python3-pip
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --user -r requirements.txt
 
@@ -32,10 +33,10 @@ VOLUME ["/app/logs"]
 ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Declare critical env vars (to be provided at runtime)
-ENV OPENAI_API_KEY=""
-ENV WSO2_TOKEN_URL=""
-ENV WSO2_CLIENT_ID=""
-ENV WSO2_CLIENT_SECRET=""
+# ENV OPENAI_API_KEY=""
+# ENV WSO2_TOKEN_URL=""
+# ENV WSO2_CLIENT_ID=""
+# ENV WSO2_CLIENT_SECRET=""
 ENV WSO2_UPDATE_API="https://apis.wso2.com/ocwn/updates-server/updates-803/v1.0/updates/product-update-levels"
 
 # Switch to non-root user
@@ -45,4 +46,4 @@ USER appuser
 EXPOSE 8000
 
 # Default command to launch the API server
-CMD ["python", "mcp_api.py"]
+CMD ["python3", "mcp_api.py"]
