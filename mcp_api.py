@@ -161,7 +161,7 @@ def get_wso2_token():
 
         response.raise_for_status()
         token = response.json().get("access_token")
-        logger.info("Parsed access_token: %s", token)
+        logger.info("Access token received: %s", token[:10] )
         return token
     except Exception as e:
         logger.error("Failed to send request to %s: %s", url, e)
@@ -185,16 +185,27 @@ def fetch_product_versions():
             "Accept": "application/json",
             # "User-Agent": "PostmanRuntime/7.42.0"
             "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2"
-
-
         }
+
+        logger.info(
+            "POSTing to %s\n headers=%s\n  auth=(%s, ****)",
+            WSO2_UPDATE_API,
+            headers,
+            WSO2_CLIENT_ID
+        )
         response = requests.get(WSO2_UPDATE_API, headers=headers)
+
+        logger.info(
+            "Response from %s → status=%s\n  body=%s",
+            WSO2_UPDATE_API,
+            response.status_code,
+            response.text
+        )
+
         response.raise_for_status()
         raw_data = response.json()  
         result = []
         logger.info(f"[INIT] raw_data: {raw_data}")
-
-
 
         for product_entry in raw_data:
             
