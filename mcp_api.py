@@ -137,7 +137,8 @@ def get_wso2_token():
             headers={
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Accept": "application/json",
-                "User-Agent": "PostmanRuntime/7.42.0"
+                # "User-Agent": "PostmanRuntime/7.42.0"
+                "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2"
             }
         )
         response.raise_for_status()
@@ -162,7 +163,10 @@ def fetch_product_versions():
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/x-www-form-urlencoded",
             "Accept": "application/json",
-            "User-Agent": "PostmanRuntime/7.42.0"
+            # "User-Agent": "PostmanRuntime/7.42.0"
+            "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2"
+
+            
         }
         response = requests.get(WSO2_UPDATE_API, headers=headers)
         response.raise_for_status()
