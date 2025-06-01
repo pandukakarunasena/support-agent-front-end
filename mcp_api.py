@@ -127,25 +127,45 @@ app = Flask(__name__)
 CORS(app)
 
 def get_wso2_token():
+    url = WSO2_TOKEN_URL
+    data = {"grant_type": "client_credentials"}
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+        "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
+    }
+
+    # Log what we’re about to send (but omit the secret itself)
+    logger.info(
+        "POSTing to %s\n  data=%s\n  headers=%s\n  auth=(%s, ****)",
+        url,
+        data,
+        headers,
+        WSO2_CLIENT_ID
+    )
+
     try:
         response = requests.post(
-            WSO2_TOKEN_URL,
-            data={
-                "grant_type": "client_credentials"
-            },
+            url,
+            data=data,
             auth=(WSO2_CLIENT_ID, WSO2_CLIENT_SECRET),
-            headers={
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json",
-                # "User-Agent": "PostmanRuntime/7.42.0"
-                "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2"
-            }
+            headers=headers
         )
+
+        logger.info(
+            "Response from %s → status=%s\n  body=%s",
+            url,
+            response.status_code,
+            response.text
+        )
+
         response.raise_for_status()
-        return response.json()["access_token"]
+        token = response.json().get("access_token")
+        logger.info("Parsed access_token: %s", token)
+        return token
     except Exception as e:
-        logger.error(f"Token fetch failed: {e}")
-        return None
+        logger.error("Failed to send request to %s: %s", url, e)
+        raise
 
 
 @app.route("/")
@@ -166,7 +186,7 @@ def fetch_product_versions():
             # "User-Agent": "PostmanRuntime/7.42.0"
             "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2"
 
-            
+
         }
         response = requests.get(WSO2_UPDATE_API, headers=headers)
         response.raise_for_status()
