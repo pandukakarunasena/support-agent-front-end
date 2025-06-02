@@ -12,7 +12,15 @@ from openai import OpenAI
 from fastmcp_http.client import FastMCPHttpClient
 import logging.handlers
 from typing import Dict, List, Any
-from flask import Flask, request, jsonify
+from flask import (
+    Flask,
+    request,
+    jsonify,
+    render_template,
+    redirect,
+    url_for,
+    make_response
+)
 from flask_cors import CORS
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -42,7 +50,7 @@ MODEL = "gpt-4o"
 if os.getenv("ENVIRONMENT") == "development-choreo":
     MCP_SERVER_URL = f"{os.getenv('MCP_SERVER_HOST', 'localhost')}"
 else:
-    MCP_SERVER_URL = f"http://{os.getenv('MCP_SERVER_HOST', 'localhost')}:{os.getenv('MCP_SERVER_PORT', '9999')}"
+    MCP_SERVER_URL = f"http://{os.getenv('MCP_SERVER_HOST_LOCAL', 'localhost')}:{os.getenv('MCP_SERVER_PORT_LOCAL', '9999')}"
 
 if not OPENAI_KEY:
     raise RuntimeError("Missing OPENAI_API_KEY in environment")
@@ -127,53 +135,166 @@ sessions: Dict[str, Session] = {}
 app = Flask(__name__)
 CORS(app)
 
-def get_wso2_token():
-    url = WSO2_TOKEN_URL
-    data = {"grant_type": "client_credentials"}
+# def get_wso2_token():
+#     url = WSO2_TOKEN_URL
+#     data = {"grant_type": "client_credentials"}
+#     headers = {
+#         "Content-Type": "application/x-www-form-urlencoded",
+#         "Accept": "application/json",
+#         "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
+#     }
+
+#     # Log what we’re about to send (but omit the secret itself)
+#     logger.info(
+#         f"POSTing to {url}\n"
+#         f"  data={data}\n"
+#         f"  headers-Accept={headers['Accept']}\n"
+#         f"  headers-User-Agent={headers['User-Agent']}\n"
+#         f"  auth=({WSO2_CLIENT_ID}, ****)"
+#     )
+
+#     try:
+#         response = requests.post(
+#             url,
+#             data=data,
+#             auth=(WSO2_CLIENT_ID, WSO2_CLIENT_SECRET),
+#             headers=headers
+#         )
+
+#         logger.info(f"Response from {url} → status={response.status_code}\n")
+
+#         response.raise_for_status()
+#         token = response.json().get("access_token")
+#         logger.info(f"Access token received: {token[:10]}")
+#         return token
+#     except Exception as e:
+#         logger.error(f"Failed to send request to {url}: {e}")
+#         return None
+    
+ACCESS_TOKEN_COOKIE = "access_token"
+INTROSPECT_URL      = os.getenv("WSO2_INTROSPECT_URL", "")  # if you have an introspection endpoint
+
+def get_token_with_credentials(username: str, password: str) -> Dict[str, Any]:
+
+    data = {
+        "grant_type": "password",
+        "username":   username,
+        "password":   password,
+        "scope":      "openid"  # adjust scopes as needed
+    }
     headers = {
+        "Accept":       "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json",
         "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
     }
-
-    # Log what we’re about to send (but omit the secret itself)
-    logger.info(
-        f"POSTing to {url}\n"
-        f"  data={data}\n"
-        f"  headers-Accept={headers['Accept']}\n"
-        f"  headers-User-Agent={headers['User-Agent']}\n"
-        f"  auth=({WSO2_CLIENT_ID}, ****)"
-    )
-
     try:
-        response = requests.post(
-            url,
+        resp = requests.post(
+            WSO2_TOKEN_URL,
             data=data,
             auth=(WSO2_CLIENT_ID, WSO2_CLIENT_SECRET),
             headers=headers
         )
-
-        logger.info(f"Response from {url} → status={response.status_code}\n")
-
-        response.raise_for_status()
-        token = response.json().get("access_token")
-        logger.info(f"Access token received: {token[:10]}")
-        return token
+        return resp.json() if resp.status_code == 200 else {"error": "invalid_credentials"}
     except Exception as e:
-        logger.error(f"Failed to send request to {url}: {e}")
-        return None
+        logger.error(f"Token request failed: {e}")
+        return {"error": "token_endpoint_unreachable"}
 
 
+def login_required(f):
+    """
+    Decorator: checks for a valid access_token cookie. If missing or invalid,
+    redirects to /login. If token introspection fails or token is inactive,
+    clears the cookie and redirects to /login.
+    """
+    from functools import wraps
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.cookies.get(ACCESS_TOKEN_COOKIE)
+        if not token:
+            return redirect(url_for("login"))
+
+        # Optional: If you have an introspection endpoint, call it:
+        if INTROSPECT_URL:
+            try:
+                introspect = requests.post(
+                    INTROSPECT_URL,
+                    data={"token": token},
+                    auth=(WSO2_CLIENT_ID, WSO2_CLIENT_SECRET),
+                    headers={"Accept": "application/json"}
+                )
+                data = introspect.json()
+                if not data.get("active"):
+                    # token is invalid/expired
+                    response = make_response(redirect(url_for("login")))
+                    response.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
+                    return response
+            except Exception:
+                # treat introspection errors as “not logged in”
+                response = make_response(redirect(url_for("login")))
+                response.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
+                return response
+
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route("/login", methods=["GET"])
+def login():
+    return render_template("login.html")  # see below
+
+@app.route("/login", methods=["POST"])
+def login_post():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    if not username or not password:
+        return render_template("login.html", error="Username and password are required.")
+
+    token_json = get_token_with_credentials(username, password)
+    if token_json.get("error"):
+        return render_template("login.html", error="Invalid credentials or token endpoint error.")
+
+    access_token = token_json.get("access_token")
+    # expires_in   = token_json.get("expires_in", 3600)
+    if not access_token:
+        return render_template("login.html", error="No access token returned by server.")
+
+    # Set cookie and redirect to chat UI
+    resp = make_response(redirect(url_for("home")))
+    expire_date = os.environ.get("TOKEN_EXPIRE")  # or compute via datetime as shown before
+    # For simplicity, set a session cookie that expires when browser closes:
+    resp.set_cookie(
+        ACCESS_TOKEN_COOKIE,
+        access_token,
+        httponly=True,
+        secure=True,       # ensure HTTPS in production
+        samesite="Strict"  # or "Lax" depending on your needs
+    )
+    return resp
+
+@app.route("/logout")
+def logout():
+    resp = make_response(redirect(url_for("login")))
+    resp.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
+    return resp
+
+# ── CHAT UI (INDEX) ──────────────────────────────────────────────────────
 
 @app.route("/")
+@login_required
 def home():
+    # Renders your chat interface (index.html)
     return render_template("index.html")
 
+# @app.route("/")
+# def home():
+#     return render_template("index.html")
+
 @app.route("/product-versions", methods=["GET"])
+@login_required
 def fetch_product_versions():
-    token = get_wso2_token()
+    token = request.cookies.get(ACCESS_TOKEN_COOKIE)
     if not token:
-        return jsonify({"error": "Failed to obtain access token"}), 500
+        return render_template("login.html", error="No access token returned by server.")
 
     try:
         headers = {
@@ -202,7 +323,7 @@ def fetch_product_versions():
         response.raise_for_status()
         raw_data = response.json()
         result = []
-        logger.info(f"[INIT] raw_data: {raw_data[:100]}")
+        # logger.info(f"[INIT] raw_data: {raw_data[:100]}")
 
         for product_entry in raw_data:
             product_name = product_entry.get("product-name")
@@ -227,6 +348,7 @@ def fetch_product_versions():
         return jsonify({"error": "Failed to fetch products"}), 500
     
 @app.route("/chat", methods=["POST"])
+@login_required
 def chat_endpoint():
     try:
         req = request.get_json()
@@ -296,12 +418,22 @@ def chat_endpoint():
                 try:
                     # Ensure the conversation ID is included in the tool call arguments
                     args["cid"] = cid
-                    logger.info(f"[{cid}] Executing tool: {tool_name} with args: {args}")
+
+                    # Pass the token to the u2 tool
+                    if (tool_name == "u2_update_summary"):
+                        logger.info(f"[{cid}] Adding access_token to tool call args")
+                        args["access_token"] = request.cookies.get(ACCESS_TOKEN_COOKIE, "") 
+                    
+                    logger.info(
+                        f"[{cid}] Executing tool: {tool_name} with args: "
+                        f"{args["query"]}, {args["product"]}, {args["version"]}, {args["cid"]}, "
+                        f"token-prefix={args["access_token"][:20]}"
+                    )
                     result = mcp.call_tool(tool_name, args)
                     data = json.loads(result[0].text)
                     logger.info(f"[{cid}] Tool execution successful: {tool_name}")
                 except Exception as e:
-                    logger.error(f"[{cid}] Tool call failed: {tool_name} – {e}")
+                    logger.info(f"[{cid}] Tool call failed: {tool_name} – {e}")
                     data = {"error": f"Tool `{tool_name}` failed", "error_code": "TOOL_CALL_ERROR"}
 
                 hits = data if isinstance(data, list) else [data]

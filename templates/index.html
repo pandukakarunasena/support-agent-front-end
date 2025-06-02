@@ -262,6 +262,31 @@
                     })
                 });
 
+                //handle redirections
+
+                if (res.redirected && res.url.endsWith("/login")) {
+                    window.location.href = "/login";
+                    return;
+                }
+                if (!res.ok) {
+                    const text = await res.text();
+                    console.error("Chat endpoint error:", text);
+                    // Show a generic error or the HTML for debugging
+                    chatBox.innerHTML += `
+                        <div class="chat-bubble bot">
+                        <div class="bubble text-danger">Server error. Please refresh or re-login.</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const contentType = res.headers.get("Content-Type") || "";
+                    if (!contentType.includes("application/json")) {
+                    // Something is wrong—got HTML instead of JSON
+                    window.location.href = "/login";
+                    return;
+                }
+
                 const data = await res.json();
                 conversationId = data.conversation_id;
 
@@ -313,6 +338,7 @@
                             `;
                 }
             } catch (err) {
+                console.log(err)
                 clearInterval(interval);
                 typingBubble.remove();
                 chatBox.innerHTML += `
