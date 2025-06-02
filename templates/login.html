@@ -2,75 +2,204 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Login – U2 - GIT AI Tool</title>
+  <title>Login – U2 · GIT AI Tool</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+
   <style>
+    /* ── Core WSO2 Brand Colors ───────────────────────────────────────────── */
+    :root {
+      --wso2-orange:     #FF7300;
+      --wso2-black:      #231F20;
+      --wso2-white:      #FFFFFF;
+      --wso2-light-gray: #F5F5F5;
+      --wso2-mid-gray:   #E0E0E0;
+      --wso2-error-red:  #C62828;
+    }
+
+    /* ── Global & Reset Styles ───────────────────────────────────────────── */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      height: 100%;
+    }
     body {
-      font-family: Arial, sans-serif;
-      background-color: #f5f5f5;
+      font-family: 'Roboto', Arial, sans-serif;
+      background-color: var(--wso2-light-gray);
       display: flex;
-      height: 100vh;
       align-items: center;
       justify-content: center;
-      margin: 0;
     }
+
+    /* ── Login Container ─────────────────────────────────────────────────── */
     .login-container {
-      background: #fff;
-      padding: 24px;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      width: 320px;
-    }
-    .login-container h2 {
-      margin-top: 0;
-      margin-bottom: 16px;
+      background-color: var(--wso2-white);
+      border: 1px solid var(--wso2-mid-gray);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      width: 380px;
+      padding: 40px 24px;
       text-align: center;
-      font-size: 24px;
     }
-    .login-container form {
-      display: flex;
-      flex-direction: column;
+
+    .login-logo {
+      width: 80px;
+      margin: 0 auto 20px;
     }
-    .login-container label {
-      margin-bottom: 4px;
+    /* If you have the WSO2 logo file, un-comment: 
+    .login-logo img {
+      max-width: 100%;
+      height: auto;
+    } */
+
+    .login-container h2 {
+      font-size: 26px;
+      color: var(--wso2-orange);
+      margin-bottom: 24px;
+      font-weight: 500;
+    }
+
+    .login-container .error {
+      color: var(--wso2-error-red);
+      margin-bottom: 16px;
       font-size: 14px;
+      text-align: left;
+      padding: 0 8px;
     }
-    .login-container input {
-      margin-bottom: 12px;
-      padding: 8px;
+
+    /* ── Floating‐Label Inputs ───────────────────────────────────────────── */
+    .floating-label {
+      position: relative;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .floating-label input {
+      width: 100%;
+      padding: 16px 12px 6px;
       font-size: 14px;
+      border: 1px solid var(--wso2-mid-gray);
+      border-radius: 6px;
+      background: var(--wso2-white);
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
+    .floating-label input:focus {
+      outline: none;
+      border-color: var(--wso2-orange);
+      box-shadow: 0 0 0 3px rgba(255, 115, 0, 0.2);
+    }
+    .floating-label label {
+      position: absolute;
+      left: 12px;
+      top: 16px;
+      font-size: 14px;
+      color: var(--wso2-mid-gray);
+      pointer-events: none;
+      transition: all 0.2s;
+      background-color: var(--wso2-white);
+      padding: 0 4px;
+    }
+    .floating-label input:focus + label,
+    .floating-label input:not(:placeholder-shown) + label {
+      top: 4px;
+      font-size: 12px;
+      color: var(--wso2-black);
+    }
+
+    /* ── Submit Button ───────────────────────────────────────────────────── */
     .login-container button {
-      padding: 10px;
+      width: 100%;
+      padding: 12px;
       font-size: 16px;
-      background-color: #007BFF;
-      color: #fff;
+      font-weight: 500;
+      background-color: var(--wso2-orange);
+      color: var(--wso2-white);
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+      margin-bottom: 24px;
     }
     .login-container button:hover {
-      background-color: #0056b3;
+      background-color: #E66A00;
     }
-    .error {
-      color: #c00;
+    .login-container button:active {
+      transform: scale(0.97);
+    }
+
+    /* ── Info Section ───────────────────────────────────────────────────── */
+    .login-info {
+      text-align: left;
+      font-size: 14px;
+      color: var(--wso2-black);
+      margin-top: 16px;
+    }
+    .login-info p {
       margin-bottom: 8px;
-      text-align: center;
+      line-height: 1.4;
+    }
+    .login-info ul {
+      list-style: disc;
+      padding-left: 20px;
+      margin-bottom: 8px;
+    }
+
+    /* ── Responsive Adjustments ──────────────────────────────────────────── */
+    @media (max-width: 420px) {
+      .login-container {
+        width: 90%;
+        padding: 32px 16px;
+      }
+      .login-info {
+        font-size: 13px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="login-container">
-    <h2>Sign In</h2>
+    <div class="login-logo">
+      <!-- <img src="{{ url_for('static', filename='wso2-logo.png') }}" alt="WSO2 Logo"> -->
+    </div>
+    <h2>U2 · GIT AI Tool</h2>
     {% if error %}
       <div class="error">{{ error }}</div>
     {% endif %}
-    <form action="{{ url_for('login_post') }}" method="post">
-      <label for="username">Username</label>
-      <input id="username" name="username" type="text" required />
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" required />
+    <form action="{{ url_for('login_post') }}" method="post" novalidate>
+      <div class="floating-label">
+        <input
+          id="username"
+          name="username"
+          type="text"
+          placeholder=" "
+          required
+        />
+        <label for="username">Username</label>
+      </div>
+      <div class="floating-label">
+        <input
+          id="password"
+          name="password"
+          type="password"
+          placeholder=" "
+          required
+        />
+        <label for="password">Password</label>
+      </div>
       <button type="submit">Log In</button>
     </form>
+
+    <div class="login-info">
+      <p>This AI tool can perform the following operations:</p>
+      <ul>
+        <li>Check U2 Summaries for already fixed issues</li>
+        <li>Find related GitHub entries</li>
+      </ul>
+      <p><strong>Note:</strong> This is an experimental tool. It may contain bugs or unexpected behavior. Verify results independently before acting on any output.</p>
+      <p><strong>Authentication Details:</strong> Use your WSO2 credentials to log in. These credentials authenticate your access to the U2 tools; no passwords or tokens are stored by this application.</p>
+    </div>
   </div>
 </body>
 </html>
