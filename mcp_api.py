@@ -426,8 +426,8 @@ def chat_endpoint():
                     
                     logger.info(
                         f"[{cid}] Executing tool: {tool_name} with args: "
-                        f"{args["query"]}, {args["product"]}, {args["version"]}, {args["cid"]}, "
-                        f"token-prefix={args["access_token"][:20]}"
+                        f"{args['query']}, {args['product']}, {args['version']}, {args['cid']}, "
+                        f"token-prefix={args['access_token'][:20]}"
                     )
                     result = mcp.call_tool(tool_name, args)
                     data = json.loads(result[0].text)
