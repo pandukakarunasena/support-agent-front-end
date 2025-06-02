@@ -49,8 +49,10 @@ MODEL = "gpt-4o"
 
 if os.getenv("ENVIRONMENT") == "development-choreo":
     MCP_SERVER_URL = f"{os.getenv('MCP_SERVER_HOST', 'localhost')}"
+    BASE_PATH = os.getenv("BASE_PATH", "/")
 else:
     MCP_SERVER_URL = f"http://{os.getenv('MCP_SERVER_HOST_LOCAL', 'localhost')}:{os.getenv('MCP_SERVER_PORT_LOCAL', '9999')}"
+    BASE_PATH = ""
 
 if not OPENAI_KEY:
     raise RuntimeError("Missing OPENAI_API_KEY in environment")
@@ -210,16 +212,16 @@ def login_required(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
-        logger.info("script_root: " + request.script_root)
-        logger.info("url: " + request.url)
-        logger.info("url_root: " + request.url_root)
-        logger.info("path: " + request.path)
-        logger.info("full_path: " + request.full_path)
-        logger.info("method: " + request.root_path)
+        # logger.info("script_root: " + request.script_root)
+        # logger.info("url: " + request.url)
+        # logger.info("url_root: " + request.url_root)
+        # logger.info("path: " + request.path)
+        # logger.info("full_path: " + request.full_path)
+        # logger.info("method: " + request.root_path)
 
         token = request.cookies.get(ACCESS_TOKEN_COOKIE)
         if not token:
-            return redirect(request.script_root + url_for("login"))
+            return redirect(BASE_PATH + "/login")
 
         # Optional: If you have an introspection endpoint, call it:
         if INTROSPECT_URL:
@@ -234,12 +236,12 @@ def login_required(f):
                 if not data.get("active"):
                     # token is invalid/expired
                     logger.info("script_root: " + request.script_root)
-                    response = make_response(redirect(request.script_root + url_for("login")))
+                    response = make_response(redirect(BASE_PATH + "/login"))
                     response.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
                     return response
             except Exception:
                 # treat introspection errors as “not logged in”
-                response = make_response(redirect(request.script_root + url_for("login")))
+                response = make_response(redirect(BASE_PATH + "/login"))
                 response.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
                 return response
 
@@ -267,7 +269,7 @@ def login_post():
         return render_template("login.html", error="No access token returned by server.")
 
     # Set cookie and redirect to chat UI
-    resp = make_response(redirect(request.script_root + url_for("home")))
+    resp = make_response(redirect(url_for("home")))
     expire_date = os.environ.get("TOKEN_EXPIRE")  # or compute via datetime as shown before
     # For simplicity, set a session cookie that expires when browser closes:
     resp.set_cookie(
@@ -282,7 +284,7 @@ def login_post():
 @app.route("/logout")
 @login_required
 def logout():
-    resp = make_response(redirect(request.script_root + url_for("login")))
+    resp = make_response(redirect(BASE_PATH + "/login"))
     resp.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
     return resp
 
