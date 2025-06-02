@@ -435,11 +435,13 @@ def chat_endpoint():
                         logger.info(f"[{cid}] Adding access_token to tool call args")
                         args["access_token"] = request.cookies.get(ACCESS_TOKEN_COOKIE, "") 
                     
-                    logger.info(
-                        f"[{cid}] Executing tool: {tool_name} with args: "
-                        f"{args['query']}, {args['product']}, {args['version']}, {args['cid']}, "
-                        f"token-prefix={args['access_token'][:20]}"
-                    )
+                        logger.info(
+                            f"[{cid}] Executing tool: {tool_name} with args: "
+                            f"{args['query']}, {args['product']}, {args['version']}, {args['cid']}, "
+                            f"token-prefix={args['access_token'][:20]}"
+                        )
+                    else:
+                        logger.info(f"[{cid}] Executing tool: {tool_name} with args: {args}")
                     result = mcp.call_tool(tool_name, args)
                     data = json.loads(result[0].text)
                     logger.info(f"[{cid}] Tool execution successful: {tool_name}")
