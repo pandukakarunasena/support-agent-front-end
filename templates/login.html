@@ -167,7 +167,7 @@
     {% if error %}
       <div class="error">{{ error }}</div>
     {% endif %}
-    <form action="{{ url_for('login_post') }}" method="post" novalidate>
+    <form action="./login" method="post" novalidate>
       <div class="floating-label">
         <input
           id="username"
