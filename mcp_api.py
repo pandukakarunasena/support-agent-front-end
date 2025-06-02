@@ -226,6 +226,7 @@ def login_required(f):
                 data = introspect.json()
                 if not data.get("active"):
                     # token is invalid/expired
+                    logger.info("script_root: " + request.script_root)
                     response = make_response(redirect(request.script_root + url_for("login")))
                     response.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
                     return response
@@ -272,6 +273,7 @@ def login_post():
     return resp
 
 @app.route("/logout")
+@login_required
 def logout():
     resp = make_response(redirect(request.script_root + url_for("login")))
     resp.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
