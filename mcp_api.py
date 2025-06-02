@@ -212,7 +212,7 @@ def login_required(f):
     def decorated(*args, **kwargs):
         token = request.cookies.get(ACCESS_TOKEN_COOKIE)
         if not token:
-            return redirect(url_for("login"))
+            return redirect(request.script_root + url_for("login"))
 
         # Optional: If you have an introspection endpoint, call it:
         if INTROSPECT_URL:
@@ -226,12 +226,12 @@ def login_required(f):
                 data = introspect.json()
                 if not data.get("active"):
                     # token is invalid/expired
-                    response = make_response(redirect(url_for("login")))
+                    response = make_response(redirect(request.script_root + url_for("login")))
                     response.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
                     return response
             except Exception:
                 # treat introspection errors as “not logged in”
-                response = make_response(redirect(url_for("login")))
+                response = make_response(redirect(request.script_root + url_for("login")))
                 response.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
                 return response
 
@@ -259,7 +259,7 @@ def login_post():
         return render_template("login.html", error="No access token returned by server.")
 
     # Set cookie and redirect to chat UI
-    resp = make_response(redirect(url_for("home")))
+    resp = make_response(redirect(request.script_root + url_for("home")))
     expire_date = os.environ.get("TOKEN_EXPIRE")  # or compute via datetime as shown before
     # For simplicity, set a session cookie that expires when browser closes:
     resp.set_cookie(
@@ -273,7 +273,7 @@ def login_post():
 
 @app.route("/logout")
 def logout():
-    resp = make_response(redirect(url_for("login")))
+    resp = make_response(redirect(request.script_root + url_for("login")))
     resp.set_cookie(ACCESS_TOKEN_COOKIE, "", expires=0)
     return resp
 
