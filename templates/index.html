@@ -13,182 +13,331 @@
     <!-- DOMPurify (sanitize the resulting HTML) -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
     <style>
-        body {
-            background-color: #f7f7f7;
-            margin: 0;
-            padding-top: 60px;    /* reserve space for top banner */
-            padding-bottom: 60px;
-        }
-        .chat-box {
-            height: 500px;
-            overflow-y: auto;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            padding: 15px;
-            background-color: #fff;
-        }
-        .chat-bubble.user {
-            text-align: right;
-        }
-        .chat-bubble.user .bubble {
-            background-color: #0d6efd;
-            color: white;
-            display: inline-block;
-            padding: 10px;
-            border-radius: 15px;
-            margin-bottom: 5px;
-        }
-        .chat-bubble.bot .bubble {
-            background-color: #e9ecef;
-            display: inline-block;
-            padding: 10px;
-            border-radius: 15px;
-            margin-bottom: 5px;
-        }
-        .chat-input {
-            display: flex;
-            gap: 10px;
+        /* ── WSO2 Brand Color Variables ───────────────────────────────────────── */
+        :root {
+        --wso2-orange:      #FF7300;
+        --wso2-dark-orange: #E66A00;
+        --wso2-black:       #231F20;
+        --wso2-white:       #FFFFFF;
+        --wso2-light-gray:  #F5F5F5;
+        --wso2-mid-gray:    #E0E0E0;
+        --wso2-error-red:   #C62828;
         }
 
-        .markdown-body {
-            color-scheme: light;
+        /* ── Body & Banners ───────────────────────────────────────────────────── **/
+
+        html, body {
+         height: 100%;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--wso2-light-gray);
+            color: var(--wso2-black);
+            display: flex;
+            flex-direction: column;
+
+            margin: 0;
+            padding-top: 60px;   
+            padding-bottom: 60px;
+        }
+
+        main {
+            flex: 1; /* fill between banners */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .experiment-banner-top,
+        .experiment-banner-bottom {
+        position: fixed;
+        left: 0;
+        width: 100%;
+        background-color: var(--wso2-white);
+        color: var(--wso2-black);
+        text-align: center;
+        padding: 12px 0;
+        font-size: 14px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
         }
 
         .experiment-banner-top {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: #fffae6;
-            color: #333;
-            text-align: center;
-            padding: 12px 0;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
+        top: 0;
         }
 
         .experiment-banner-bottom {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background-color: #fffae6;
-            color: #333;
-            text-align: center;
-            padding: 12px 0;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
+        bottom: 0;
         }
 
+        /* ── Chat Box ────────────────────────────────────────────────────────── */
+        .chat-box {
+        height: 500px;
+        overflow-y: auto;
+        border: 1px solid var(--wso2-mid-gray);
+        border-radius: 5px 5px 0 0;
+        padding: 15px;
+        background-color: var(--wso2-white);
+        }
+
+        /* ── Chat Bubbles ────────────────────────────────────────────────────── */
+        .chat-bubble {
+        margin-bottom: 10px;
+        display: flex;
+        }
+
+        .chat-bubble.user {
+        justify-content: flex-end;
+        }
+
+        .chat-bubble.user .bubble {
+        background-color: var(--wso2-orange);
+        color: var(--wso2-white);
+        display: inline-block;
+        padding: 10px;
+        border-radius: 15px 15px 0 15px;
+        max-width: 75%;
+        }
+
+        .chat-bubble.bot {
+        justify-content: flex-start;
+        }
+
+        .chat-bubble.bot .bubble {
+        background-color: var(--wso2-mid-gray);
+        color: var(--wso2-black);
+        display: inline-block;
+        padding: 10px;
+        border-radius: 15px 15px 15px 0;
+        max-width: 75%;
+        }
+
+        /* ── Chat Input Area ────────────────────────────────────────────────── */
+        .chat-input {
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+        background-color: var(--wso2-white);
+        border: 1px solid var(--wso2-mid-gray);
+        border-radius: 0 0 5px 5px;
+        }
+
+        .chat-input input {
+        flex: 1;
+        padding: 10px;
+        font-size: 14px;
+        border: 1px solid var(--wso2-mid-gray);
+        border-radius: 4px;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .chat-input input:focus {
+        outline: none;
+        border-color: var(--wso2-orange);
+        box-shadow: 0 0 0 3px rgba(255, 115, 0, 0.2);
+        }
+
+        .chat-input button {
+        padding: 10px 16px;
+        background-color: var(--wso2-orange);
+        color: var(--wso2-white);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .chat-input button:hover {
+        background-color: var(--wso2-dark-orange);
+        }
+
+        .chat-input button:active {
+        transform: scale(0.97);
+        }
+
+        /* ── Markdown Body (light mode) ───────────────────────────────────────── */
+        .markdown-body {
+        color-scheme: light;
+        }
+
+        /* ── Modal Overlay & Box ─────────────────────────────────────────────── */
         .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.5);
-            display: none;            /* hidden by default */
-            align-items: center;      /* vertical centering */
-            justify-content: center;  /* horizontal centering */
-            z-index: 2000;            /* above banners */
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;            /* hidden by default */
+        align-items: center;      /* vertical centering */
+        justify-content: center;  /* horizontal centering */
+        z-index: 2000;            /* above banners */
         }
+
         .modal-box {
-            background: #fff;
-            border-radius: 4px;
-            max-width: 400px;
-            width: 90%;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            font-family: Arial, sans-serif;
-            text-align: center;
-            position: relative;
+        background: var(--wso2-white);
+        border-radius: 4px;
+        max-width: 400px;
+        width: 90%;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        text-align: center;
+        position: relative;
         }
+
         .modal-box h2 {
-            margin-top: 0;
-            font-size: 20px;
+        margin-top: 0;
+        font-size: 20px;
+        color: var(--wso2-black);
         }
+
         .modal-box p {
-            margin: 12px 0;
-            font-size: 14px;
-            line-height: 1.4;
+        margin: 12px 0;
+        font-size: 14px;
+        line-height: 1.4;
+        color: var(--wso2-black);
         }
+
         .modal-box button.close-btn {
-            margin-top: 16px;
-            padding: 8px 16px;
-            font-size: 14px;
-            background-color: #333;
-            color: #fff;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
+        margin-top: 16px;
+        padding: 8px 16px;
+        font-size: 14px;
+        background-color: var(--wso2-orange);
+        color: var(--wso2-white);
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: background-color 0.2s;
         }
+
         .modal-box button.close-btn:hover {
-            background-color: #555;
+        background-color: var(--wso2-dark-orange);
         }
 
-
-        /* Option B: target dark-mode variables directly */
-        @media (prefers-color-scheme: dark) {
-            .markdown-body {
-                --color-canvas-default: #fff !important;
-                --color-canvas-subtle:  #f6f8fa !important;
-                --color-fg-default:      #24292e !important;
-                --color-fg-muted:        #6e7681 !important;
-                --color-fg-subtle:       #6e7681 !important;
+        .chat-header {
+            background-color: var(--wso2-orange);
+            color: var(--wso2-white);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-radius: 8px 8px 0 0;
             }
+            .chat-header h3 {
+            font-size: 20px;
+            margin: 0;
+            }
+            .chat-header button {
+            background-color: var(--wso2-white);
+            color: var(--wso2-orange);
+            border: none;
+            padding: 6px 12px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            }
+            .chat-header button:hover {
+            background-color: var(--wso2-light-gray);
+            }
+
+           
+
+        /* ── Responsive Adjustments ──────────────────────────────────────────── */
+        @media (max-width: 768px) {
+          .chat-box {
+            height: 60vh;
+          }
+          .bubble {
+            max-width: 85%;
+          }
+          .chat-input-area {
+            flex-direction: column;
+          }
+          .chat-input-area input {
+            margin-bottom: 8px;
+          }
+          .chat-input-area button {
+            width: 100%;
+            margin-left: 0;
+          }
         }
+        @media (max-width: 576px) {
+          .chat-container {
+            padding: 0 10px;
+          }
+          .chat-box {
+            height: 55vh;
+            padding: 10px;
+          }
+          .chat-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+          }
+          .chat-header h3 {
+            font-size: 18px;
+          }
+          .chat-header button {
+            font-size: 14px;
+            padding: 8px 12px;
+          }
+        }
+
     </style>
 </head>
 <body>
     <div class="experiment-banner-top">
         ⚠️ This application is provided for experimental purposes only. It may contain bugs, inaccuracies, or unexpected behavior. Always verify any information independently and use caution before making decisions based on its output.
     </div>
-    <div id="first-visit-modal" class="modal-overlay">
-        <div class="modal-box">
-          <h2>AI Tool Capabilities</h2>
-          <p>This AI tool can perform the following operations:</p>
-          <ul>
-            <li>
-              <strong>Check U2 Summaries for already fixed issues</strong><br />
-            </li>
-            <li style="margin-top: 8px;">
-              <strong>Find related Github entries</strong><br />
-            </li>
-          </ul>
-          <p>Please note: This is an experimental tool. It may contain bugs or unexpected behavior. Verify results independently before acting on them.</p>
-          <button class="close-btn" id="modal-close-btn">Got it!</button>
+    <main>
+        <div id="first-visit-modal" class="modal-overlay">
+            <div class="modal-box">
+              <h2>AI Tool Capabilities</h2>
+              <p>This AI tool can perform the following operations:</p>
+              <ul>
+                <li>
+                  <strong>Check U2 Summaries for already fixed issues</strong><br />
+                </li>
+                <li style="margin-top: 8px;">
+                  <strong>Find related Github entries</strong><br />
+                </li>
+              </ul>
+              <p>Please note: This is an experimental tool. It may contain bugs or unexpected behavior. Verify results independently before acting on them.</p>
+              <button class="close-btn" id="modal-close-btn">Got it!</button>
+            </div>
         </div>
-    </div>
-    <div class="container py-4">
-        <div class="mb-3">
-            <label for="product-select" class="form-label">Select Product</label>
-            <select class="form-select" id="product-select" disabled>
-                <option selected>Loading...</option>
-            </select>
-        
-            <label for="version-select" class="form-label mt-2">Select Version</label>
-            <select class="form-select" id="version-select">
-                <option selected>Select a product first</option>
-            </select>
+        <div class="container py-4">
+            <div class="chat-header">
+                <h3 class="mb-0">U2 - Git Assistant</h3>
+                <button id="logoutBtn" onclick="logout()">Logout</button>
+            </div>
+            <div class="mb-3 mt-3">
+                <!-- <label for="product-select" class="form-label">Select Product</label> -->
+                <select class="form-select mb-1" id="product-select" disabled>
+                    <option selected>Loading...</option>
+                </select>
+            
+                <!-- <label for="version-select" class="form-label mt-2">Select Version</label> -->
+                <select class="form-select" id="version-select">
+                    <option selected>Select a product first</option>
+                </select>
+            </div>
+            
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <button class="btn btn-sm btn-outline-secondary" onclick="startNewChat()">New Chat</button>
+            </div>
+    
+            <div class="chat-box mb-3" id="chat-box"></div>
+            <div class="chat-input">
+                <input type="text" id="message" class="form-control" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendMessage()">
+                <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+            </div>
         </div>
-        
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3 class="mb-0">U2 - Git Assistant</h3>
-            <button class="btn btn-sm btn-outline-secondary" onclick="startNewChat()">New Chat</button>
-        </div>
-        <div class="chat-box mb-3" id="chat-box"></div>
-        <div class="chat-input">
-            <input type="text" id="message" class="form-control" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendMessage()">
-            <button class="btn btn-primary" onclick="sendMessage()">Send</button>
-        </div>
-    </div>
-    <div class="experiment-banner-bottom">
+    </main>
+    <!-- <div class="experiment-banner-bottom">
         ⚠️ This application is provided for experimental purposes only. It may contain bugs, inaccuracies, or unexpected behavior. Always verify any information independently and use caution before making decisions based on its output.
-    </div>
+    </div> -->
     
     <script>
 
@@ -357,13 +506,32 @@
             const newWindow = window.open("/", "_blank");
         }
 
+        function logout() {
+            fetch("./logout", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            })
+            .then(res => {
+                if (res.ok) {
+                    window.location.href = "/login";
+                } else {
+                    console.error("Logout failed");
+                }
+            })
+            .catch(err => {
+                console.error("Logout error:", err);
+            });
+        }
+
         let productVersionMap = {};
 
         async function loadProductVersions() {
             const res = await fetch("./product-versions");
             const data = await res.json();
 
-            console.log("Received data:", data);
+            // console.log("Received data:", data);
 
             const productSelect = document.getElementById("product-select");
             const versionSelect = document.getElementById("version-select");
@@ -377,7 +545,9 @@
             // Build dropdown and lookup map
             data.forEach(entry => {
                 productVersionMap[entry.product] = entry.versions;
-
+                entry.versions.sort((a, b) =>
+                    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+                );
                 const opt = document.createElement("option");
                 opt.value = entry.product;
                 opt.textContent = entry.product;
