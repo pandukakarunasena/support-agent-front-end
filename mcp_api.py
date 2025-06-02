@@ -269,7 +269,7 @@ def login_post():
         return render_template("login.html", error="No access token returned by server.")
 
     # Set cookie and redirect to chat UI
-    resp = make_response(redirect(url_for("home")))
+    resp = make_response(redirect(BASE_PATH + "/"))
     expire_date = os.environ.get("TOKEN_EXPIRE")  # or compute via datetime as shown before
     # For simplicity, set a session cookie that expires when browser closes:
     resp.set_cookie(
