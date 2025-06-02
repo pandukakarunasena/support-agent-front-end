@@ -99,7 +99,7 @@ SYSTEM_MESSAGE = {
         "  \"wso2am\": \"product-apim\",\n"
         "}\n\n"
         "When the user describes a problem:\n"
-        " 1. Decide which tool(s) to call. The priority should go to the u2_update_summary tool, and ask if the user needs to get GitHub issues. If the user says GitHub issues are needed, run the github_find_related_issues tool.\n"
+        " 1. Decide which tool(s) to call.If no tool call is needed do a web search using web search tool available by default. The priority should go to the u2_update_summary tool, and ask if the user needs to get GitHub issues. If the user says GitHub issues are needed, run the github_find_related_issues tool.\n"
         " 2. If calling **github_find_related_issues**, extract **one** single-word technical term from their text and pass it as term.\n"
         " 3. If calling **u2_update_summary**, extract the product version (e.g. “v5.11.0”) and pass it as product_version; if missing, ask the user for it. Pass a summarized query to the tool to fetch entries as well.\n"
         " 4. If you need other data, prompt the user for it.\n"
@@ -312,7 +312,7 @@ def chat_endpoint():
                 logger.info(f"[{cid}] Waiting for user decision to summarize tool output")
                 resp = make_response(jsonify({
                     "conversation_id": cid,
-                    "message": "Below Entries have been found from U2 and Github. You can get a summary by typing 'continue' or 'yes'.",
+                    "message": "Attached tools to Agent found below entries. You can get a summary by typing 'continue' or 'yes'.",
                     "needs_more": True,
                     "hits": sess.hits
                 }))
