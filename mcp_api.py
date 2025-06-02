@@ -210,6 +210,13 @@ def login_required(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
+        logger.info("script_root: " + request.script_root)
+        logger.info("url: " + request.url)
+        logger.info("url_root: " + request.url_root)
+        logger.info("path: " + request.path)
+        logger.info("full_path: " + request.full_path)
+        logger.info("method: " + request.root_path)
+
         token = request.cookies.get(ACCESS_TOKEN_COOKIE)
         if not token:
             return redirect(request.script_root + url_for("login"))
