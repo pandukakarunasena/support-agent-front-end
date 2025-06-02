@@ -15,9 +15,12 @@
     <style>
         body {
             background-color: #f7f7f7;
+            margin: 0;
+            padding-top: 60px;    /* reserve space for top banner */
+            padding-bottom: 60px;
         }
         .chat-box {
-            height: 400px;
+            height: 500px;
             overflow-y: auto;
             border: 1px solid #dee2e6;
             border-radius: 5px;
@@ -51,6 +54,37 @@
             color-scheme: light;
         }
 
+        .experiment-banner-top {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #fffae6;
+            color: #333;
+            text-align: center;
+            padding: 12px 0;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .experiment-banner-bottom {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #fffae6;
+            color: #333;
+            text-align: center;
+            padding: 12px 0;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+
         /* Option B: target dark-mode variables directly */
         @media (prefers-color-scheme: dark) {
             .markdown-body {
@@ -64,6 +98,9 @@
     </style>
 </head>
 <body>
+    <div class="experiment-banner-top">
+        ⚠️ This application is provided for experimental purposes only. It may contain bugs, inaccuracies, or unexpected behavior. Always verify any information independently and use caution before making decisions based on its output.
+      </div>
     <div class="container py-4">
         <div class="mb-3">
             <label for="product-select" class="form-label">Select Product</label>
@@ -87,7 +124,10 @@
             <button class="btn btn-primary" onclick="sendMessage()">Send</button>
         </div>
     </div>
-
+    <div class="experiment-banner-bottom">
+        ⚠️ This application is provided for experimental purposes only. It may contain bugs, inaccuracies, or unexpected behavior. Always verify any information independently and use caution before making decisions based on its output.
+    </div>
+    
     <script>
         let conversationId = null;
 
