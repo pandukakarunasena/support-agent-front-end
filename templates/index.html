@@ -514,9 +514,13 @@
                 }
             })
             .then(res => {
-                if (!res.ok) {
-                    console.error("Logout failed");
-                } 
+                if (res.redirected) {
+                    window.location.href = res.url;
+                } else if (res.ok) {
+                    window.location.href = "./login";
+                } else {
+                    console.error("Logout failed:", res.status);
+                }
             })
             .catch(err => {
                 console.error("Logout error:", err);
