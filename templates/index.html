@@ -420,7 +420,8 @@
                 if (!res.ok) {
                     const text = await res.text();
                     console.error("Chat endpoint error:", text);
-                    // Show a generic error or the HTML for debugging
+                    // remove AI Typing box
+                    document.getElementById("typing-indicator").style.display = "none"
                     chatBox.innerHTML += `
                         <div class="chat-bubble bot">
                         <div class="bubble text-danger">Server error. Please refresh or re-login.</div>
