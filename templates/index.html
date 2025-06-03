@@ -291,8 +291,28 @@
                 --color-fg-default:      #24292e !important;
                 --color-fg-muted:        #6e7681 !important;
                 --color-fg-subtle:       #6e7681 !important;
+            }
+        .issue-report {
+            background-color: #fff9e6; /* light warning background */
+            border: 1px solid #ffd27f; /* subtle border */
+            color: #665002;             /* dark warning text */
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            border-radius: 4px;
+            font-family: sans-serif;
+            text-align: center;
         }
-}
+
+        .issue-report a {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+
+        .issue-report a:hover {
+            text-decoration: none;
+        }
+    }
 
     </style>
 </head>
@@ -345,9 +365,10 @@
             </div>
         </div>
     </main>
-    <!-- <div class="experiment-banner-bottom">
-        ⚠️ This application is provided for experimental purposes only. It may contain bugs, inaccuracies, or unexpected behavior. Always verify any information independently and use caution before making decisions based on its output.
-    </div> -->
+    <div class="issue-report">
+        Please report any issues  in the sheet 
+        <a href="https://docs.google.com/spreadsheets/d/1VL3NF3fzS0oPeqzSW7f9TUsncwbYW9-2RU4RjfVv7AE/edit?usp=sharing" target="_blank" rel="noopener">here</a> with ConversationID:  <span id="conv-id">[[to get a conversation ID send a message]]</span>
+    </div>
     
     <script>
 
@@ -449,6 +470,7 @@
 
                 const data = await res.json();
                 conversationId = data.conversation_id;
+                document.getElementById('conv-id').textContent = conversationId;
 
                 clearInterval(interval);
                 typingBubble.remove();
