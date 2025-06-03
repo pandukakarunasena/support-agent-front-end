@@ -114,7 +114,7 @@ SYSTEM_MESSAGE = {
         " 3. If calling **u2_update_summary**, extract the product version (e.g. “v5.11.0”) and pass it as product_version; if missing, ask the user for it. Pass a summarized query to the tool to fetch entries as well.\n"
         " 4. If you need other data, prompt the user for it.\n"
         " 5. After each tool call, wait for the tool result before deciding to call more tools or to compose the final answer.\n"
-        " 6. if the user input is continue or yes no tool calls should be executed. It must output the final message without any tool invocations.\n"
+        " 6. if the user input is continue or yes no tool calls should be executed. It must output the final summary of the data obtained from the tools calls without further tool call invocations.\n"
         " 7. If no tool is appropriate, answer directly.\n"
         " 8. If no related GitHub issues or summaries are found, tell the user “no related issue found.”"
     )
