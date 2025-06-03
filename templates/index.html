@@ -48,18 +48,44 @@
             justify-content: center;
         }
 
-        .experiment-banner-top,
-        .experiment-banner-bottom {
-        position: fixed;
-        left: 0;
-        width: 100%;
-        background-color: var(--wso2-white);
-        color: var(--wso2-black);
-        text-align: center;
-        padding: 12px 0;
-        font-size: 14px;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-        z-index: 1000;
+        .experiment-banner-top {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--wso2-white);
+            color: var(--wso2-black);
+            text-align: center;
+            padding: 12px 0 8px;   /* (12px top, 2px bottom) */
+            font-size: 10px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        /* adjust this “top” based on the real height of .experiment-banner-top + small gap */
+        .issue-report {
+            position: fixed;
+            top: 32px;           /* ~24px banner height + 2px gap */
+            left: 0;
+            width: 100%;
+            background-color: #fff9e6; /* light warning background */
+            border: 1px solid #ffd27f; /* subtle border */
+            color: #665002;            /* dark warning text */
+            padding: 8px;
+            font-size: 14px;
+            border-radius: 4px;
+            font-family: sans-serif;
+            text-align: center;
+            z-index: 999;        /* just below the top banner */
+        }
+
+        .issue-report a {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+
+        .issue-report a:hover {
+            text-decoration: none;
         }
 
         .experiment-banner-top {
@@ -292,26 +318,6 @@
                 --color-fg-muted:        #6e7681 !important;
                 --color-fg-subtle:       #6e7681 !important;
             }
-        .issue-report {
-            background-color: #fff9e6; /* light warning background */
-            border: 1px solid #ffd27f; /* subtle border */
-            color: #665002;             /* dark warning text */
-            padding: 8px 12px;
-            margin-bottom: 12px;
-            font-size: 14px;
-            border-radius: 4px;
-            font-family: sans-serif;
-            text-align: center;
-        }
-
-        .issue-report a {
-            color: #0056b3;
-            text-decoration: underline;
-        }
-
-        .issue-report a:hover {
-            text-decoration: none;
-        }
     }
 
     </style>
@@ -319,6 +325,10 @@
 <body>
     <div class="experiment-banner-top">
         ⚠️ This application is provided for experimental purposes only. It may contain bugs, inaccuracies, or unexpected behavior. Always verify any information independently and use caution before making decisions based on its output.
+    </div>
+    <div class="issue-report">
+        Please report any issues  in the sheet 
+        <a href="https://docs.google.com/spreadsheets/d/1VL3NF3fzS0oPeqzSW7f9TUsncwbYW9-2RU4RjfVv7AE/edit?usp=sharing" target="_blank" rel="noopener">here</a> with ConversationID:  <span id="conv-id">[[to get a conversation ID send a message]]</span>
     </div>
     <main>
         <div id="first-visit-modal" class="modal-overlay">
@@ -365,10 +375,7 @@
             </div>
         </div>
     </main>
-    <div class="issue-report">
-        Please report any issues  in the sheet 
-        <a href="https://docs.google.com/spreadsheets/d/1VL3NF3fzS0oPeqzSW7f9TUsncwbYW9-2RU4RjfVv7AE/edit?usp=sharing" target="_blank" rel="noopener">here</a> with ConversationID:  <span id="conv-id">[[to get a conversation ID send a message]]</span>
-    </div>
+   
     
     <script>
 
