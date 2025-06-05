@@ -318,7 +318,7 @@ def auth_redirect():
         "state": state,
     })
 
-    return redirect(f"{os.getenv("ASGARDEO_AUTH_ENDPOINT")}?{query}")
+    return redirect(os.getenv("ASGARDEO_AUTH_ENDPOINT") + "?" + query)
 
 @app.route("/authcallback")
 def auth_callback():
