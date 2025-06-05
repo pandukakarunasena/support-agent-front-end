@@ -519,14 +519,46 @@
                     });
                 } else {
                     console.log("No hits found in response data.");
-                    const messageDivId = "message-div";
-                    chatBox.innerHTML += `
-                                <div class="chat-bubble bot">
-                                    <div class="bubble">
-                                        <div class="${messageDivId}">${renderMarkdownContent(data.message)}</div>
-                                    </div>
-                                </div>
-                            `;
+
+                    const message = data.message || "No response available.";
+                    // const feedbackId = `fallback-${conversationId}-${Date.now()}`;
+                    const encodedDescription = message.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+                    const bubbleWrapper = document.createElement("div");
+                    bubbleWrapper.className = "chat-bubble bot";
+
+                    const bubbleDiv = document.createElement("div");
+                    bubbleDiv.className = "bubble";
+
+                    const messageDiv = document.createElement("div");
+                    messageDiv.className = "markdown-body";
+                    messageDiv.innerHTML = renderMarkdownContent(message);
+
+                    const feedbackContainer = document.createElement("div");
+                    feedbackContainer.className = "mt-2";
+
+                    const btnYes = document.createElement("button");
+                    btnYes.textContent = "👍 Accurate";
+                    btnYes.className = "btn btn-sm btn-outline-success me-2";
+                    btnYes.addEventListener("click", function () {
+                        markAsRelated(conversationId, "LLM-ANSWER", "", encodedDescription, true, btnYes);
+                    });
+
+                    const btnNo = document.createElement("button");
+                    btnNo.textContent = "👎 Not Accurate";
+                    btnNo.className = "btn btn-sm btn-outline-danger";
+                    btnNo.addEventListener("click", function () {
+                        markAsRelated(conversationId, "LLM-ANSWER", "", encodedDescription, false, btnNo);
+                    });
+
+                    feedbackContainer.appendChild(btnYes);
+                    feedbackContainer.appendChild(btnNo);
+
+                    // Assemble and append
+                    bubbleDiv.appendChild(messageDiv);
+                    bubbleDiv.appendChild(feedbackContainer);
+                    bubbleWrapper.appendChild(bubbleDiv);
+                    chatBox.appendChild(bubbleWrapper);
                 }
             } catch (err) {
                 console.log(err)
@@ -705,6 +737,10 @@
                 results.forEach((issue, index) => {
                     if (!issue.error) {
                         console.log(issue);
+
+                        const feedbackId = `${issue["url"]}-${issue["title"]}`;
+                        const encodedDescription = issue.body.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
                         const card = document.createElement("div");
                         card.className = "card mb-3";
                         card.innerHTML = `
@@ -827,8 +863,14 @@
             })
             .then(res => res.text())
             .then(msg => {
-                statusSpan.textContent = isRelated ? "✅ Marked as Related" : "❌ Marked as Not Related";
-                statusSpan.className = "ms-2 small fw-semibold " + (isRelated ? "text-success" : "text-danger");
+
+                if (tool == "LLM-ANSWER") {
+                    statusSpan.textContent = isRelated ? "✅ Marked as Accurate" : "❌ Marked as Not Accurate";
+                    statusSpan.className = "ms-2 small fw-semibold " + (isRelated ? "text-success" : "text-danger");
+                } else {
+                    statusSpan.textContent = isRelated ? "✅ Marked as Related" : "❌ Marked as Not Related";
+                    statusSpan.className = "ms-2 small fw-semibold " + (isRelated ? "text-success" : "text-danger");
+                }
             })
             .catch(err => {
                 console.error("Feedback error:", err);
