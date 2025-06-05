@@ -296,7 +296,7 @@ def login_post():
         access_token,
         httponly=True,
         secure=True,       # ensure HTTPS in production
-        samesite="Strict"  # or "Lax" depending on your needs
+        samesite="Lax"  # or "Lax" depending on your needs
     )
     return resp
 
@@ -359,7 +359,8 @@ def auth_callback():
         access_token,
         httponly=True,
         secure=True,
-        samesite="Strict"
+        samesite="Lax",
+        path=BASE_PATH
     )
     return resp
 
@@ -373,7 +374,7 @@ def logout():
 # ── CHAT UI (INDEX) ──────────────────────────────────────────────────────
 
 @app.route("/")
-# @login_required
+@login_required
 def home():
     # Renders your chat interface (index.html)
     return render_template("index.html")
