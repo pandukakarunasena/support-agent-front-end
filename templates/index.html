@@ -453,8 +453,8 @@
 
                 //handle redirections
 
-                if (res.redirected && res.url.endsWith("/login")) {
-                    window.location.href = "/login";
+                if (res.redirected && res.url.endsWith("./login")) {
+                    window.location.href = "./login";
                     return;
                 }
                 if (!res.ok) {
@@ -473,7 +473,7 @@
                 const contentType = res.headers.get("Content-Type") || "";
                     if (!contentType.includes("application/json")) {
                     // Something is wrong—got HTML instead of JSON
-                    window.location.href = "/login";
+                    window.location.href = "./login";
                     return;
                 }
 
