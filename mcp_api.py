@@ -579,6 +579,27 @@ def chat_endpoint():
         }), 500)
         resp.headers["X-Conversation-ID"] = cid
         return resp
+    
+@app.route("/feedback", methods=["POST"])
+@login_required
+def feedback_endpoint():
+    try:
+        data = request.get_json()
+        conversation_id = data.get("conversation_id", "unknown")
+        tool = data.get("tool", "unknown")
+        issue_url = data.get("issue_url", "N/A")
+        description = (data.get("description") or "").strip().replace("\n", " ")
+        related = data.get("related")
+
+        logger.info(
+            f"[{conversation_id}] FEEDBACK RECEIVED – Tool: {tool}, URL: {issue_url}, Related: {related}, Desc: {description[:200]}"
+        )
+
+        return jsonify({"status": "ok"}), 200
+
+    except Exception as e:
+        logger.exception("Failed to log feedback")
+        return jsonify({"error": "Failed to log feedback"}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
