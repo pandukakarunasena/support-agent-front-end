@@ -484,15 +484,15 @@
 
                 if (data.hits && data.hits.length > 0) {
 
-                    chatBox.innerHTML += `
-                                <div class="chat-bubble bot">
-                                    <div class="bubble"><pre style="white-space: pre-wrap;">${data.message}</pre></div>
-                                </div>
-                            `;
+                    // chatBox.innerHTML += `
+                    //             <div class="chat-bubble bot">
+                    //                 <div class="bubble"><pre style="white-space: pre-wrap;">${data.message}</pre></div>
+                    //             </div>
+                    //         `;
                     data.hits.forEach((hit, index) => {
                         if (hit.tool && hit.results) {
                             // Insert a placeholder div for rendering
-                            const toolDivId = `tool-result-${index}`;
+                            const toolDivId = `tool-result-${Date.now()}-${Math.random().toString(36).slice(2)}`;
                             chatBox.innerHTML += `
                                 <div class="chat-bubble bot">
                                     <div class="bubble">
@@ -632,6 +632,11 @@
                 toolHeader.textContent = `Tool: ${toolName}`;
                 container.appendChild(toolHeader);
 
+                if (results.length <= 0) {
+                    container.innerHTML = `<p class='text-info'>No related issues found.</p>`;
+                    return;
+                }
+
                 results.forEach((entry, index) => {
                     console.log("Rendering entry:", entry);
 
@@ -641,6 +646,7 @@
                         card.innerHTML = `
                             <div class="card-body">
                                 <h5 class="card-title">Update #${entry["update-number"]} (Level ${entry["update-level"]})</h5>
+                                <h6 class="card-title">Product :${entry["product-name"]} (Version ${entry["product-version"]})</h6>
                                 <p class="card-text"><strong>Description:</strong><br>${(entry.description || "").replace(/\n/g, "<br>")}</p>
                                 <div><strong>Related Issues:</strong><br>${renderRelatedIssues(entry["bug-fixes"])}</div>
                             </div>
@@ -654,9 +660,15 @@
                     }
                 });
             } else if (toolName == "github_find_related_issues") {
+
                 const toolHeader = document.createElement("h4");
                 toolHeader.textContent = `Tool: ${toolName}`;
                 container.appendChild(toolHeader);
+
+                if (results.length <= 0) {
+                    container.innerHTML = `<p class='text-info'>No related issues found.</p>`;
+                    return;
+                }
 
                 results.forEach((issue, idx) => {
                     if (!issue.error) {
@@ -703,7 +715,7 @@
                 return "No bug fixes listed.";
             }
 
-            return urls.map(url => `<a href="${url}" target="_blank">${url}</a>`).join("<br>");
+            return `[${urls.map(url => `<a href="${url}" target="_blank">${url}</a>`).join(", ")}]`;
         }
 
         function renderMarkdownContent(content) {

@@ -167,28 +167,8 @@
     {% if error %}
       <div class="error">{{ error }}</div>
     {% endif %}
-    <form action="./login" method="post" novalidate>
-      <div class="floating-label">
-        <input
-          id="username"
-          name="username"
-          type="text"
-          placeholder=" "
-          required
-        />
-        <label for="username">Username</label>
-      </div>
-      <div class="floating-label">
-        <input
-          id="password"
-          name="password"
-          type="password"
-          placeholder=" "
-          required
-        />
-        <label for="password">Password</label>
-      </div>
-      <button type="submit">Log In</button>
+    <form action="./authlogin" method="post" novalidate>
+        <button type="submit">Log In with WSO2</button>
     </form>
 
     <div class="login-info">

@@ -2,6 +2,7 @@
 import os
 import uuid
 import requests
+import hashlib
 import json
 import logging
 import logging.handlers
@@ -109,7 +110,7 @@ SYSTEM_MESSAGE = {
         "  \"wso2am\": \"product-apim\",\n"
         "}\n\n"
         "When the user describes a problem:\n"
-        " 1. Decide which tool(s) to call.If no tool call is needed do a web search using web search tool available by default. The priority should go to the u2_update_summary tool, and ask if the user needs to get GitHub issues. If the user says GitHub issues are needed, run the github_find_related_issues tool.\n"
+        " 1. Decide which tool(s) to call.If user request a tool to check it must be executed. If no tool call is needed do a web search using web search tool available by default. The priority should go to the u2_update_summary tool, and ask if the user needs to get GitHub issues. If the user says GitHub issues are needed, run the github_find_related_issues tool.\n"
         " 2. If calling **github_find_related_issues**, extract **one** single-word technical term from their text and pass it as term.\n"
         " 3. If calling **u2_update_summary**, extract the product version (e.g. “v5.11.0”) and pass it as product_version; if missing, ask the user for it. Pass a summarized query to the tool to fetch entries as well.\n"
         " 4. If you need other data, prompt the user for it.\n"
@@ -138,41 +139,58 @@ sessions: Dict[str, Session] = {}
 app = Flask(__name__)
 CORS(app)
 
-# def get_wso2_token():
-#     url = WSO2_TOKEN_URL
-#     data = {"grant_type": "client_credentials"}
-#     headers = {
-#         "Content-Type": "application/x-www-form-urlencoded",
-#         "Accept": "application/json",
-#         "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
-#     }
+def hash_entry(entry):
+    """Create a hash for a given hit result (based on JSON content)."""
+    return hashlib.sha256(json.dumps(entry, sort_keys=True).encode()).hexdigest()
 
-#     # Log what we’re about to send (but omit the secret itself)
-#     logger.info(
-#         f"POSTing to {url}\n"
-#         f"  data={data}\n"
-#         f"  headers-Accept={headers['Accept']}\n"
-#         f"  headers-User-Agent={headers['User-Agent']}\n"
-#         f"  auth=({WSO2_CLIENT_ID}, ****)"
-#     )
+def add_tool_results(sess, tool_name, hits):
+    existing_tool_entry = next((entry for entry in sess.hits if entry["tool"] == tool_name), None)
 
-#     try:
-#         response = requests.post(
-#             url,
-#             data=data,
-#             auth=(WSO2_CLIENT_ID, WSO2_CLIENT_SECRET),
-#             headers=headers
-#         )
+    new_hashes = {hash_entry(hit) for hit in hits}
 
-#         logger.info(f"Response from {url} → status={response.status_code}\n")
+    if existing_tool_entry:
+        existing_hashes = {hash_entry(hit) for hit in existing_tool_entry["results"]}
+        unique_hits = [hit for hit in hits if hash_entry(hit) not in existing_hashes]
+        if unique_hits:
+            existing_tool_entry["results"].extend(unique_hits)
+    else:
+        sess.hits.append({"tool": tool_name, "results": hits})
 
-#         response.raise_for_status()
-#         token = response.json().get("access_token")
-#         logger.info(f"Access token received: {token[:10]}")
-#         return token
-#     except Exception as e:
-#         logger.error(f"Failed to send request to {url}: {e}")
-#         return None
+def get_wso2_token():
+    url = WSO2_TOKEN_URL
+    data = {"grant_type": "client_credentials"}
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+        "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
+    }
+
+    # Log what we’re about to send (but omit the secret itself)
+    logger.info(
+        f"POSTing to {url}\n"
+        f"  data={data}\n"
+        f"  headers-Accept={headers['Accept']}\n"
+        f"  headers-User-Agent={headers['User-Agent']}\n"
+        f"  auth=({WSO2_CLIENT_ID}, ****)"
+    )
+
+    try:
+        response = requests.post(
+            url,
+            data=data,
+            auth=(WSO2_CLIENT_ID, WSO2_CLIENT_SECRET),
+            headers=headers
+        )
+
+        logger.info(f"Response from {url} → status={response.status_code}\n")
+
+        response.raise_for_status()
+        token = response.json().get("access_token")
+        logger.info(f"Access token received: {token[:10]}")
+        return token
+    except Exception as e:
+        logger.error(f"Failed to send request to {url}: {e}")
+        return None
     
 ACCESS_TOKEN_COOKIE = "access_token"
 INTROSPECT_URL      = os.getenv("WSO2_INTROSPECT_URL", "")  # if you have an introspection endpoint
@@ -282,6 +300,69 @@ def login_post():
     )
     return resp
 
+@app.route("/authlogin", methods=["POST"])
+def auth_redirect():
+    import urllib.parse
+
+    client_id = os.getenv("WSO2_CLIENT_ID")
+    redirect_uri = os.getenv("APP_REDIRECT_URI", f"{request.url_root.rstrip('/')}{BASE_PATH}/authcallback")
+    scope = "openid profile"
+    response_type = "code"
+    state = str(uuid.uuid4())  # Optional, for CSRF protection
+
+    query = urllib.parse.urlencode({
+        "response_type": response_type,
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "scope": scope,
+        "state": state,
+    })
+
+    return redirect(f"{os.getenv("ASGARDEO_AUTH_ENDPOINT")}?{query}")
+
+@app.route("/authcallback")
+def auth_callback():
+    import requests
+
+    code = request.args.get("code")
+    if not code:
+        return render_template("login.html", error="Authorization failed or denied.")
+
+    # Exchange code for tokens
+    token_url = os.getenv("WSO2_TOKEN_URL", "https://api.asgardeo.io/t/wso2/oauth2/token")
+    redirect_uri = os.getenv("APP_REDIRECT_URI", f"{request.url_root.rstrip('/')}{BASE_PATH}/authcallback")
+
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "client_id": os.getenv("WSO2_CLIENT_ID"),
+        "client_secret": os.getenv("WSO2_CLIENT_SECRET"),  
+    }
+
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    token_response = requests.post(token_url, data=data, headers=headers)
+
+    if token_response.status_code != 200:
+        return render_template("login.html", error="Token exchange failed.")
+
+    token_json = token_response.json()
+    access_token = token_json.get("access_token")
+
+    if not access_token:
+        return render_template("login.html", error="Access token missing in response.")
+
+    # Set access token as cookie
+    resp = make_response(redirect(BASE_PATH + "/"))
+    resp.set_cookie(
+        ACCESS_TOKEN_COOKIE,
+        access_token,
+        httponly=True,
+        secure=True,
+        samesite="Strict"
+    )
+    return resp
+
 @app.route("/logout")
 @login_required
 def logout():
@@ -292,7 +373,7 @@ def logout():
 # ── CHAT UI (INDEX) ──────────────────────────────────────────────────────
 
 @app.route("/")
-@login_required
+# @login_required
 def home():
     # Renders your chat interface (index.html)
     return render_template("index.html")
@@ -305,6 +386,7 @@ def home():
 @login_required
 def fetch_product_versions():
     token = request.cookies.get(ACCESS_TOKEN_COOKIE)
+    # token = get_wso2_token()
     if not token:
         return render_template("login.html", error="No access token returned by server.")
 
@@ -437,6 +519,7 @@ def chat_endpoint():
                     if (tool_name == "u2_update_summary"):
                         logger.info(f"[{cid}] Adding access_token to tool call args")
                         args["access_token"] = request.cookies.get(ACCESS_TOKEN_COOKIE, "") 
+                        # args["access_token"] = get_wso2_token()
                     
                         logger.info(
                             f"[{cid}] Executing tool: {tool_name} with args: "
@@ -445,6 +528,7 @@ def chat_endpoint():
                         )
                     else:
                         logger.info(f"[{cid}] Executing tool: {tool_name} with args: {args}")
+
                     result = mcp.call_tool(tool_name, args)
                     data = json.loads(result[0].text)
                     logger.info(f"[{cid}] Tool execution successful: {tool_name}")
@@ -453,7 +537,10 @@ def chat_endpoint():
                     data = {"error": f"Tool `{tool_name}` failed", "error_code": "TOOL_CALL_ERROR"}
 
                 hits = data if isinstance(data, list) else [data]
-                sess.hits.append({"tool": tool_name, "results": hits})
+                # add only unique hits to the session
+                # add_tool_results(sess, tool_name, hits)
+                sess.hits.clear()
+                sess.hits.append({"tool": tool_name, "results": hits})  # Clear previous hits before adding new ones
                 sess.history.append({"role": "assistant", "content": json.dumps(sess.hits, separators=(",", ":"))})
 
                 sess.awaiting_decision = True
