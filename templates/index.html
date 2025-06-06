@@ -58,7 +58,7 @@
             color: var(--wso2-black);
             text-align: center;
             padding: 12px 0 8px;   /* (12px top, 2px bottom) */
-            font-size: 16px;
+            font-size: 10px;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
             border-bottom: 1px solid #ffc5c5;           /* soft border */
             z-index: 1000;
@@ -328,10 +328,10 @@
     <div class="experiment-banner-top">
         ⚠️ This application is provided for experimental purposes only. It may contain bugs, inaccuracies, or unexpected behavior. Always verify any information independently and use caution before making decisions based on its output.
     </div>
-    <!-- <div class="issue-report">
+    <div class="issue-report">
         Please report any issues  in the sheet 
         <a href="https://docs.google.com/spreadsheets/d/1VL3NF3fzS0oPeqzSW7f9TUsncwbYW9-2RU4RjfVv7AE/edit?usp=sharing" target="_blank" rel="noopener">here</a> with ConversationID:  <span id="conv-id">[[to get a conversation ID send a message]]</span>
-    </div> -->
+    </div>
     <main>
         <div id="first-visit-modal" class="modal-overlay">
             <div class="modal-box">
@@ -479,7 +479,7 @@
 
                 const data = await res.json();
                 conversationId = data.conversation_id;
-                // document.getElementById('conv-id').textContent = conversationId;
+                document.getElementById('conv-id').textContent = conversationId;
 
                 clearInterval(interval);
                 typingBubble.remove();
