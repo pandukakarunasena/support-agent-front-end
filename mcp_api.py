@@ -100,7 +100,7 @@ SYSTEM_MESSAGE = {
         " • u2_update_summary(product_version: str)\n"
         "   – Fetch the JSON summary of fixes/improvements for a specific product version.\n\n"
         "Before using any tools:\n"
-        " - For u2_update_summary, use the product and product version.\n"
+        " - For u2_update_summary, use the product and product version. start update level and end update level\n"
         " - For github_find_related_issues, use the repository name derived from the product via PRODUCT_REPO_MAP.\n\n"
         "PRODUCT_REPO_MAP = {\n"
         "  \"wso2is\": \"product-is\",\n"
@@ -130,7 +130,7 @@ class Session:
         self.id = cid
         self.history: List[Dict[str, Any]] = [SYSTEM_MESSAGE.copy()]
         self.hits: List[Dict[str, Any]] = []
-        self.awaiting_decision: bool = False
+        # self.awaiting_decision: bool = False
 
 sessions: Dict[str, Session] = {}
 
@@ -156,69 +156,9 @@ def add_tool_results(sess, tool_name, hits):
     else:
         sess.hits.append({"tool": tool_name, "results": hits})
 
-def get_wso2_token():
-    url = WSO2_TOKEN_URL
-    data = {"grant_type": "client_credentials"}
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json",
-        "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
-    }
-
-    # Log what we’re about to send (but omit the secret itself)
-    logger.info(
-        f"POSTing to {url}\n"
-        f"  data={data}\n"
-        f"  headers-Accept={headers['Accept']}\n"
-        f"  headers-User-Agent={headers['User-Agent']}\n"
-        f"  auth=({WSO2_CLIENT_ID}, ****)"
-    )
-
-    try:
-        response = requests.post(
-            url,
-            data=data,
-            auth=(WSO2_CLIENT_ID, WSO2_CLIENT_SECRET),
-            headers=headers
-        )
-
-        logger.info(f"Response from {url} → status={response.status_code}\n")
-
-        response.raise_for_status()
-        token = response.json().get("access_token")
-        logger.info(f"Access token received: {token[:10]}")
-        return token
-    except Exception as e:
-        logger.error(f"Failed to send request to {url}: {e}")
-        return None
     
 ACCESS_TOKEN_COOKIE = "access_token"
 INTROSPECT_URL      = os.getenv("WSO2_INTROSPECT_URL", "")  # if you have an introspection endpoint
-
-def get_token_with_credentials(username: str, password: str) -> Dict[str, Any]:
-
-    data = {
-        "grant_type": "password",
-        "username":   username,
-        "password":   password,
-        "scope":      "openid"  # adjust scopes as needed
-    }
-    headers = {
-        "Accept":       "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "MyFlaskAppTest/1.0 (Flask/2.3.2)"
-    }
-    try:
-        resp = requests.post(
-            WSO2_TOKEN_URL,
-            data=data,
-            auth=(WSO2_CLIENT_ID, WSO2_CLIENT_SECRET),
-            headers=headers
-        )
-        return resp.json() if resp.status_code == 200 else {"error": "invalid_credentials"}
-    except Exception as e:
-        logger.error(f"Token request failed: {e}")
-        return {"error": "token_endpoint_unreachable"}
 
 
 def login_required(f):
@@ -270,35 +210,6 @@ def login_required(f):
 @app.route("/login", methods=["GET"])
 def login():
     return render_template("login.html")  # see below
-
-@app.route("/login", methods=["POST"])
-def login_post():
-    username = request.form.get("username", "").strip()
-    password = request.form.get("password", "").strip()
-    if not username or not password:
-        return render_template("login.html", error="Username and password are required.")
-
-    token_json = get_token_with_credentials(username, password)
-    if token_json.get("error"):
-        return render_template("login.html", error="Invalid credentials or token endpoint error.")
-
-    access_token = token_json.get("access_token")
-    # expires_in   = token_json.get("expires_in", 3600)
-    if not access_token:
-        return render_template("login.html", error="No access token returned by server.")
-
-    # Set cookie and redirect to chat UI
-    resp = make_response(redirect(BASE_PATH + "/"))
-    expire_date = os.environ.get("TOKEN_EXPIRE")  # or compute via datetime as shown before
-    # For simplicity, set a session cookie that expires when browser closes:
-    resp.set_cookie(
-        ACCESS_TOKEN_COOKIE,
-        access_token,
-        httponly=True,
-        secure=True,       # ensure HTTPS in production
-        samesite="Lax"  # or "Lax" depending on your needs
-    )
-    return resp
 
 @app.route("/authlogin", methods=["POST"])
 def auth_redirect():
@@ -379,9 +290,6 @@ def home():
     # Renders your chat interface (index.html)
     return render_template("index.html")
 
-# @app.route("/")
-# def home():
-#     return render_template("index.html")
 
 @app.route("/product-versions", methods=["GET"])
 @login_required
@@ -420,6 +328,8 @@ def fetch_product_versions():
         result = []
         # logger.info(f"[INIT] raw_data: {raw_data[:100]}")
 
+        result = []
+
         for product_entry in raw_data:
             product_name = product_entry.get("product-name")
             product_name = product_name.lower()
@@ -428,16 +338,23 @@ def fetch_product_versions():
 
             update_levels = product_entry.get("product-update-levels", [])
 
+            # Now include update-levels per version
+            versions = []
+            for version_info in update_levels:
+                base_version = version_info.get("product-base-version")
+                if base_version:
+                    versions.append({
+                        "version": base_version,
+                        "update_levels": version_info.get("update-levels", [])
+                    })
+
             result.append({
                 "product": product_name,
-                "versions": [
-                    version_info.get("product-base-version")
-                    for version_info in update_levels
-                    if version_info.get("product-base-version")
-                ]
+                "versions": versions
             })
 
         return jsonify(result)
+
     except Exception as e:
         logger.error(f"Products fetch failed: {e}")
         return jsonify({"error": "Failed to fetch products"}), 500
@@ -451,50 +368,53 @@ def chat_endpoint():
         user_input = req.get("user_input", "").strip()
         product_name = req.get("product")
         product_version = req.get("version")
+        start_u_level = req.get("start_u_level", None)
+        end_u_level = req.get("end_u_level", None)
 
-        logger.info(f"[{cid}] Received request – User input: {user_input}, Product: {product_name}, Version: {product_version}")
+        logger.info(f"[{cid}] Received request – User input: {user_input}, Product: {product_name}, Version: {product_version}, Start U-Level: {start_u_level}, End U-Level: {end_u_level}")    
 
         if not user_input:
             logger.warning(f"[{cid}] Empty input received")
             resp = make_response(jsonify({"error_code": "EMPTY_INPUT", "message": "Input is required"}), 400)
             resp.headers["X-Conversation-ID"] = cid
             return resp
+        if not product_name:    
+            logger.warning(f"[{cid}] No product specified")
+            resp = make_response(jsonify({"error_code": "NO_PRODUCT", "message": "Product is required"}), 400)
+            resp.headers["X-Conversation-ID"] = cid
+            return resp
+        if not product_version:
+            logger.warning(f"[{cid}] No product version specified")
+            resp = make_response(jsonify({"error_code": "NO_VERSION", "message": "Product version is required"}), 400)
+            resp.headers["X-Conversation-ID"] = cid
+            return resp
+        if not start_u_level:
+            logger.warning(f"[{cid}] No start U-Level specified")
+            resp = make_response(jsonify({"error_code": "NO_START_U_LEVEL", "message": "Start U-Level is required"}), 400)
+            resp.headers["X-Conversation-ID"] = cid
+            return resp
+        if not end_u_level:
+            logger.warning(f"[{cid}] No end U-Level specified")
+            resp = make_response(jsonify({"error_code": "NO_END_U_LEVEL", "message": "End U-Level is required"}), 400)
+            resp.headers["X-Conversation-ID"] = cid
+            return resp
 
         sess = sessions.setdefault(cid, Session(cid))
+        sess.hits.clear()  # Clear hits at the start of the turn
 
+        # Add context to history
         if product_name:
             sess.history.append({"role": "user", "content": f"[product={product_name}]"})
-            logger.info(f"[{cid}] Product added to session: {product_name}")
         if product_version:
             sess.history.append({"role": "user", "content": f"[version={product_version}]"})
-            logger.info(f"[{cid}] Version added to session: {product_version}")
+        if start_u_level:   
+            sess.history.append({"role": "user", "content": f"[start_u_level={start_u_level}]"})
+        if end_u_level:
+            sess.history.append({"role": "user", "content": f"[end_u_level={end_u_level}]"})
 
         sess.history.append({"role": "user", "content": user_input})
-        logger.info(f"[{cid}] User input added to session history")
 
         chat_input = sess.history[1:]
-
-        if sess.awaiting_decision and user_input.lower() in {"continue", "yes"}:
-            sess.awaiting_decision = False
-            logger.info(f"[{cid}] Resuming from tool decision...")
-            response = oai.responses.create(
-                model=MODEL,
-                instructions=SYSTEM_MESSAGE["content"],
-                input=chat_input,
-                # tools=oai_tools,
-                # tool_choice="auto",
-            )
-            logger.info(f"[{cid}] Tool response summary sent to user")
-            output = response.output[0]
-            if output.type == "message":
-                resp = make_response(jsonify({
-                    "conversation_id": cid,
-                    "message": response.output[0].content[0].text,
-                    "needs_more": False,
-                    "hits": None
-                }))
-                resp.headers["X-Conversation-ID"] = cid
-                return resp
 
         logger.info(f"[{cid}] Sending input to LLM")
         llm_resp = oai.responses.create(
@@ -507,54 +427,70 @@ def chat_endpoint():
         logger.info(f"[{cid}] Received response from LLM")
 
         tool_calls = [o for o in llm_resp.output if o.type == "function_call"]
+
+        # If there are tool calls, execute and summarize
         if tool_calls:
-            logger.info(f"[{cid}] Tool calls detected: {[call.name for call in tool_calls]}")
+            all_hits = []
             for call in tool_calls:
                 args = json.loads(call.arguments or "{}")
                 tool_name = call.name
                 try:
-                    # Ensure the conversation ID is included in the tool call arguments
                     args["cid"] = cid
-
-                    # Pass the token to the u2 tool
-                    if (tool_name == "u2_update_summary"):
-                        logger.info(f"[{cid}] Adding access_token to tool call args")
-                        args["access_token"] = request.cookies.get(ACCESS_TOKEN_COOKIE, "") 
-                        # args["access_token"] = get_wso2_token()
-                    
-                        logger.info(
-                            f"[{cid}] Executing tool: {tool_name} with args: "
-                            f"{args['query']}, {args['product']}, {args['version']}, {args['cid']}, "
-                            f"token-prefix={args['access_token'][:20]}"
-                        )
-                    else:
-                        logger.info(f"[{cid}] Executing tool: {tool_name} with args: {args}")
-
+                    if tool_name == "u2_update_summary":
+                        args["access_token"] = request.cookies.get(ACCESS_TOKEN_COOKIE, "")
+                        args["query"] = user_input
+                    logger.info(f"[{cid}] Executing tool: {tool_name} with args: {args}")
                     result = mcp.call_tool(tool_name, args)
                     data = json.loads(result[0].text)
-                    logger.info(f"[{cid}] Tool execution successful: {tool_name}")
+                    hits = data if isinstance(data, list) else [data]
                 except Exception as e:
                     logger.info(f"[{cid}] Tool call failed: {tool_name} – {e}")
-                    data = {"error": f"Tool `{tool_name}` failed", "error_code": "TOOL_CALL_ERROR"}
+                    hits = [{"error": f"Tool `{tool_name}` failed", "error_code": "TOOL_CALL_ERROR"}]
 
-                hits = data if isinstance(data, list) else [data]
-                # add only unique hits to the session
-                # add_tool_results(sess, tool_name, hits)
-                sess.hits.clear()
-                sess.hits.append({"tool": tool_name, "results": hits})  # Clear previous hits before adding new ones
-                sess.history.append({"role": "assistant", "content": json.dumps(sess.hits, separators=(",", ":"))})
+                tool_hit = {"tool": tool_name, "results": hits}
+                all_hits.append(tool_hit)
 
-                sess.awaiting_decision = True
-                logger.info(f"[{cid}] Waiting for user decision to summarize tool output")
-                resp = make_response(jsonify({
-                    "conversation_id": cid,
-                    "message": "Attached tools to Agent found below entries. You can get a summary by typing 'continue' or 'yes'.",
-                    "needs_more": True,
-                    "hits": sess.hits
-                }))
-                resp.headers["X-Conversation-ID"] = cid
-                return resp
+            sess.hits = all_hits
+            # Add tool results to session history as user message (for LLM context
 
+            tool_results_msg = (
+                "Based on the following tool results (in JSON):\n"
+                f"{json.dumps(sess.hits, indent=2)}\n\n"
+                "Compose your response in three sections: 'Analysis', 'Tool Results Used', and 'Conclusion'.\n"
+                "  - In 'Analysis', summarize the main technical issue, referencing relevant evidence from the tool results.\n"
+                "  - In 'Tool Results Used', list which specific tool entries informed your analysis (use IDs, titles, or clear descriptors).\n"
+                "  - In 'Conclusion', provide a clear, actionable summary or fix, suitable for a technical user.\n"
+                "Be concise, do not repeat raw JSON, and make your reasoning explicit."
+            )
+
+
+            sess.history.append({"role": "user", "content": tool_results_msg})
+
+            logger.info(f"[{cid}] Sending tool results and summary prompt to LLM")
+            summary_resp = oai.responses.create(
+                model=MODEL,
+                instructions=SYSTEM_MESSAGE["content"],
+                input=sess.history[1:],
+            )
+            logger.info(f"[{cid}] Got summary from LLM")
+
+            summary_text = ""
+            message_chunks = [o for o in summary_resp.output if o.type == "message"]
+            if message_chunks:
+                summary_text = "".join(c.text for c in message_chunks[0].content)
+            else:
+                summary_text = "No summary could be generated."
+
+            sess.history.append({"role": "assistant", "content": summary_text})
+            resp = make_response(jsonify({
+                "conversation_id": cid,
+                "message": summary_text,
+                "hits": sess.hits
+            }))
+            resp.headers["X-Conversation-ID"] = cid
+            return resp
+
+        # Otherwise, just reply with LLM's answer
         message_chunks = [o for o in llm_resp.output if o.type == "message"]
         assistant_reply = "".join(c.text for c in message_chunks[0].content)
         sess.history.append({"role": "assistant", "content": assistant_reply})
@@ -562,7 +498,6 @@ def chat_endpoint():
         resp = make_response(jsonify({
             "conversation_id": cid,
             "message": assistant_reply,
-            "needs_more": False,
             "hits": None
         }))
         resp.headers["X-Conversation-ID"] = cid
@@ -574,11 +509,11 @@ def chat_endpoint():
             "error_code": "CHAT_PROCESSING_ERROR",
             "message": "Sorry, something went wrong.",
             "conversation_id": req.get("conversation_id", "unknown"),
-            "needs_more": False,
             "hits": None
         }), 500)
         resp.headers["X-Conversation-ID"] = cid
         return resp
+
     
 @app.route("/feedback", methods=["POST"])
 @login_required

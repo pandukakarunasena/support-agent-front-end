@@ -186,6 +186,8 @@
         /* ── Markdown Body (light mode) ───────────────────────────────────────── */
         .markdown-body {
         color-scheme: light;
+        border-radius: 4px;
+        padding: 10px;
         }
 
         /* ── Modal Overlay & Box ─────────────────────────────────────────────── */
@@ -320,8 +322,48 @@
                 --color-fg-muted:        #6e7681 !important;
                 --color-fg-subtle:       #6e7681 !important;
             }
-    }
+        }
 
+        .tool-results-row {
+            display: flex;
+            flex-direction: row;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 2px;
+        }
+        .tool-card {
+            max-width: min(90vw, 22rem);    /* 22rem = 352px max, but shrink on small screens */
+            min-width: 11rem;               /* ≈176px minimum for mobile */
+            font-size: 0.92em;
+            border-radius: 10px;
+            border: 1px solid var(--wso2-mid-gray);
+            background: #fafbfc;
+            box-shadow: 0 1px 3px rgba(44,62,80,0.08);
+            flex: 1 1 14rem;                /* base width in row flex */
+            height: min(32vw, 18rem);       /* responsive fixed height */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .tool-card .card-body {
+            overflow-y: auto;
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.75rem 1rem;
+        }
+
+        @media (max-width: 800px) {
+            .tool-results-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+            .tool-card {
+                max-width: 100%;
+                min-width: 0;
+            }
+        }
+        
     </style>
 </head>
 <body>
@@ -354,18 +396,28 @@
                 <h3 class="mb-0">U2 - Git Assistant</h3>
                 <button id="logoutBtn" onclick="logout()">Logout</button>
             </div>
-            <div class="mb-3 mt-3">
-                <!-- <label for="product-select" class="form-label">Select Product</label> -->
-                <select class="form-select mb-1" id="product-select" disabled>
-                    <option selected>Loading...</option>
-                </select>
-            
-                <!-- <label for="version-select" class="form-label mt-2">Select Version</label> -->
-                <select class="form-select" id="version-select">
-                    <option selected>Select a product first</option>
-                </select>
+            <div class="row mb-3 mt-3 g-2">
+                <div class="col-12 col-md-3">
+                    <select class="form-select" id="product-select" disabled>
+                        <option selected>Loading...</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <select class="form-select" id="version-select">
+                        <option selected>Select a product first</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <select class="form-select" id="start-u-level">
+                        <option selected>Select a starting update level</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <select class="form-select" id="end-u-level">
+                        <option selected>Select a ending update level</option>
+                    </select>
+                </div>
             </div>
-            
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <button class="btn btn-sm btn-outline-secondary" onclick="startNewChat()">New Chat</button>
             </div>
@@ -395,133 +447,296 @@
         });
         let conversationId = null;
 
+        function validateInputs() {
+            const query = document.getElementById("message").value.trim();
+            const product = document.getElementById("product-select").value;
+            const version = document.getElementById("version-select").value;
+            const startUlevel = document.getElementById("start-u-level").value;
+            const endUlevel = document.getElementById("end-u-level").value;
+
+            let message = "";
+
+            if (!product || product === "Loading..." || product === "Select a product") {
+                message = "Please select a valid product.";
+            } else if (!version || version === "Select a product first" || version === "Select version") {
+                message = "Please select a valid version.";
+            } else if (!startUlevel || isNaN(startUlevel) || Number(startUlevel) < 0) {
+                message = "Please enter a valid Start U-Level (must be a non-negative number).";
+            } else if (!endUlevel || isNaN(endUlevel) || Number(endUlevel) < 0) {
+                message = "Please enter a valid End U-Level (must be a non-negative number).";
+            } else if (Number(endUlevel) < Number(startUlevel)) {
+                message = "End U-Level must be greater than or equal to Start U-Level.";
+            } else if (!query) {
+                message = "Please enter a message to send.";
+            }
+
+            if (message) {
+                // Show the validation error (Bootstrap alert style)
+                alert(message, "danger");
+                return false;
+            }
+
+            return {
+                query,
+                product,
+                version,
+                startUlevel: Number(startUlevel),
+                endUlevel: Number(endUlevel)
+            };
+        }
+
+        // Helper function to display an alert (reuse this wherever needed)
+        function showAlert(msg, type = "info") {
+            let alertBox = document.getElementById("validation-alert");
+            if (!alertBox) {
+                alertBox = document.createElement("div");
+                alertBox.id = "validation-alert";
+                alertBox.className = `alert alert-${type} mt-2`;
+                document.querySelector(".row.mb-3").after(alertBox); // Place after inputs
+            }
+            alertBox.textContent = msg;
+        }
+
         async function sendMessage() {
-    const product = document.getElementById("product-select").value;
-    const version = document.getElementById("version-select").value;
-    const input = document.getElementById("message");
-    const chatBox = document.getElementById("chat-box");
-    const message = input.value.trim();
+            
+            const userInput = validateInputs();
 
-    if (!product || product == "Select a product" || !version || version == "Select a version") {
-        alert("Please select a product and version before sending a message.");
-        return;
-    }
-    if (!message) {
-        alert("Message Cannot be empty.");
-        return;
-    }
+            if (!userInput) {
+                return; // Validation failed, do not proceed
+            }
 
-    // --- Add User Bubble ---
-    const userBubble = document.createElement("div");
-    userBubble.className = "chat-bubble user";
-    const userInner = document.createElement("div");
-    userInner.className = "bubble";
-    userInner.textContent = message;
-    userBubble.appendChild(userInner);
-    chatBox.appendChild(userBubble);
-    input.value = "";
+            // const product = document.getElementById("product-select").value;
+            // const version = document.getElementById("version-select").value;
+            const input = document.getElementById("message");
+            const chatBox = document.getElementById("chat-box");
+            // const message = input.value.trim();
 
-    // --- Add AI Typing Bubble ---
-    const typingBubble = document.createElement("div");
-    typingBubble.className = "chat-bubble bot";
-    typingBubble.innerHTML = `<div class="bubble" id="typing-indicator">AI is typing</div>`;
-    chatBox.appendChild(typingBubble);
-    chatBox.scrollTop = chatBox.scrollHeight;
+            // --- Add User Bubble ---
+            const userBubble = document.createElement("div");
+            userBubble.className = "chat-bubble user";
+            const userInner = document.createElement("div");
+            userInner.className = "bubble";
+            userInner.textContent = userInput.query; // Use the validated query
+            userBubble.appendChild(userInner);
+            chatBox.appendChild(userBubble);
+            input.value = "";
 
-    let dots = 0;
-    const interval = setInterval(() => {
-        dots = (dots + 1) % 4;
-        const indicator = document.getElementById("typing-indicator");
-        if (indicator) {
-            indicator.textContent = "AI is typing" + ".".repeat(dots);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-    }, 500);
+            // --- Add AI Typing Bubble ---
+            const typingBubble = document.createElement("div");
+            typingBubble.className = "chat-bubble bot";
+            typingBubble.innerHTML = `<div class="bubble" id="typing-indicator">AI is typing</div>`;
+            chatBox.appendChild(typingBubble);
+            // chatBox.scrollTop = chatBox.scrollHeight;
 
-    try {
-        const res = await fetch("./chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Conversation-ID": conversationId || ""
-            },
-            body: JSON.stringify({
-                conversation_id: conversationId,
-                user_input: message,
-                product: product,
-                version: version
-            })
-        });
+            let dots = 0;
+            const interval = setInterval(() => {
+                dots = (dots + 1) % 4;
+                const indicator = document.getElementById("typing-indicator");
+                if (indicator) {
+                    indicator.textContent = "AI is typing" + ".".repeat(dots);
+                    // chatBox.scrollTop = chatBox.scrollHeight;
+                }
+            }, 500);
 
-        // Handle redirections
-        if (res.redirected && res.url.endsWith("./login")) {
-            window.location.href = "./login";
-            return;
-        }
-        if (!res.ok) {
-            const text = await res.text();
-            console.error("Chat endpoint error:", text);
-            clearInterval(interval);
-            typingBubble.remove();
-            const errBubble = document.createElement("div");
-            errBubble.className = "chat-bubble bot";
-            const errInner = document.createElement("div");
-            errInner.className = "bubble text-danger";
-            errInner.textContent = "Server error. Please refresh or re-login.";
-            errBubble.appendChild(errInner);
-            chatBox.appendChild(errBubble);
-            chatBox.scrollTop = chatBox.scrollHeight;
-            return;
-        }
+            try {
+                const res = await fetch("./chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Conversation-ID": conversationId || ""
+                    },
+                    body: JSON.stringify({
+                        conversation_id: conversationId,
+                        user_input: userInput.query,
+                        product: userInput.product,
+                        version: userInput.version,
+                        start_u_level: userInput.startUlevel,
+                        end_u_level: userInput.endUlevel
+                    })
+                });
 
-        const contentType = res.headers.get("Content-Type") || "";
-        if (!contentType.includes("application/json")) {
-            window.location.href = "./login";
-            return;
-        }
+                // Handle redirections
+                if (res.redirected && res.url.endsWith("./login")) {
+                    window.location.href = "./login";
+                    return;
+                }
+                if (!res.ok) {
+                    const text = await res.text();
+                    console.error("Chat endpoint error:", text);
+                    clearInterval(interval);
+                    typingBubble.remove();
+                    const errBubble = document.createElement("div");
+                    errBubble.className = "chat-bubble bot";
+                    const errInner = document.createElement("div");
+                    errInner.className = "bubble text-danger";
+                    errInner.textContent = "Server error. Please refresh or re-login.";
+                    errBubble.appendChild(errInner);
+                    chatBox.appendChild(errBubble);
+                    // chatBox.scrollTop = chatBox.scrollHeight;
+                    return;
+                }
 
-        const data = await res.json();
-        conversationId = data.conversation_id;
-        document.getElementById('conv-id').textContent = conversationId;
+                const contentType = res.headers.get("Content-Type") || "";
+                if (!contentType.includes("application/json")) {
+                    window.location.href = "./login";
+                    return;
+                }
 
-        clearInterval(interval);
-        typingBubble.remove();
+                const data = await res.json();
+                conversationId = data.conversation_id;
+                document.getElementById('conv-id').textContent = conversationId;
 
-        // ---- Bot Response Handling ----
-        if (data.hits && data.hits.length > 0) {
-            data.hits.forEach((hit, index) => {
-                if (hit.tool && hit.results) {
-                    // Create tool bubble, insert a container, then call renderToolResults as before.
-                    const toolDivId = `tool-result-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-                    const botBubble = document.createElement("div");
-                    botBubble.className = "chat-bubble bot";
-                    const bubbleInner = document.createElement("div");
-                    bubbleInner.className = "bubble";
-                    const toolDiv = document.createElement("div");
-                    toolDiv.id = toolDivId;
-                    bubbleInner.appendChild(toolDiv);
-                    botBubble.appendChild(bubbleInner);
-                    chatBox.appendChild(botBubble);
-                    setTimeout(() => {
-                        renderToolResults({
-                            tool: hit.tool,
-                            results: hit.results
-                        }, toolDivId);
-                    }, 0);
+                clearInterval(interval);
+                typingBubble.remove();
+
+                // ---- Bot Response Handling ----
+                if (data.hits && data.hits.length > 0) {
+                    // tool call hits with LLM analysis
+                    if (data.message) {
+                        renderMessage(data.message, chatBox, conversationId);
+                    }
+                    renderToolHits(data.hits, chatBox);
                 } else {
-                    // fallback for unknown hit
-                    const fallbackBubble = document.createElement("div");
-                    fallbackBubble.className = "chat-bubble bot";
-                    const fallbackInner = document.createElement("div");
-                    fallbackInner.className = "bubble";
-                    fallbackInner.innerHTML = `<pre style="white-space: pre-wrap;">${JSON.stringify(hit, null, 2)}</pre>`;
-                    fallbackBubble.appendChild(fallbackInner);
-                    chatBox.appendChild(fallbackBubble);
+                    // no tool calls just LLM response
+                    renderMessage(data.message, chatBox, conversationId);
+                }
+                
+            } catch (err) {
+                clearInterval(interval);
+                typingBubble.remove();
+                const errBubble = document.createElement("div");
+                errBubble.className = "chat-bubble bot";
+                const errInner = document.createElement("div");
+                errInner.className = "bubble text-danger";
+                errInner.textContent = "Oops, something went wrong.";
+                errBubble.appendChild(errInner);
+                chatBox.appendChild(errBubble);
+                console.error(err);
+            }
+
+            // chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+
+        function startNewChat() {
+            const newWindow = window.open("./", "_blank");
+        }
+
+        function logout() {
+            fetch("./logout", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            })
+            .then(res => {
+                if (res.redirected) {
+                    window.location.href = res.url;
+                } else if (res.ok) {
+                    window.location.href = "./login";
+                } else {
+                    console.error("Logout failed:", res.status);
+                }
+            })
+            .catch(err => {
+                console.error("Logout error:", err);
+            });
+        }
+
+        let productVersionMap = {};
+
+        async function loadProductVersions() {
+            const res = await fetch("./product-versions");
+            const data = await res.json();
+
+            const productSelect = document.getElementById("product-select");
+            const versionSelect = document.getElementById("version-select");
+            const startUlevelInput = document.getElementById("start-u-level");
+            const endUlevelInput = document.getElementById("end-u-level");
+
+            productSelect.innerHTML = '<option selected disabled>Select a product</option>';
+            versionSelect.innerHTML = '<option selected disabled>Select a version</option>';
+            startUlevelInput.innerHTML = '<option selected disabled>Start U-Level</option>';
+            endUlevelInput.innerHTML = '<option selected disabled>End U-Level</option>';
+            productSelect.disabled = false;
+
+            // Map: { product: [ { version, update_levels }, ... ] }
+            const productVersionMap = {};
+
+            // Build product dropdown and lookup map
+            data.forEach(entry => {
+                productVersionMap[entry.product] = entry.versions; // versions is array of objects now
+                entry.versions.sort((a, b) =>
+                    a.version.localeCompare(b.version, undefined, { numeric: true, sensitivity: 'base' })
+                );
+                const opt = document.createElement("option");
+                opt.value = entry.product;
+                opt.textContent = entry.product;
+                productSelect.appendChild(opt);
+            });
+
+            // Product selection handler
+            productSelect.addEventListener("change", () => {
+                const selectedProduct = productSelect.value;
+                const versions = productVersionMap[selectedProduct] || [];
+
+                versionSelect.innerHTML = '<option selected disabled>Select a version</option>';
+                startUlevelInput.innerHTML = '<option selected disabled>Start U-Level</option>';
+                endUlevelInput.innerHTML = '<option selected disabled>End U-Level</option>';
+
+                versions.forEach(verObj => {
+                    const opt = document.createElement("option");
+                    opt.value = verObj.version;
+                    opt.textContent = verObj.version;
+                    versionSelect.appendChild(opt);
+                });
+            });
+
+            // Version selection handler
+            versionSelect.addEventListener("change", () => {
+                const selectedProduct = productSelect.value;
+                const versions = productVersionMap[selectedProduct] || [];
+                const selectedVersion = versionSelect.value;
+                const verObj = versions.find(v => v.version === selectedVersion);
+
+                startUlevelInput.innerHTML = '<option selected disabled>Start U-Level</option>';
+                endUlevelInput.innerHTML = '<option selected disabled>End U-Level</option>';
+
+                if (verObj && Array.isArray(verObj.update_levels)) {
+                    verObj.update_levels.forEach(ulevel => {
+                        const startOpt = document.createElement("option");
+                        startOpt.value = ulevel;
+                        startOpt.textContent = ulevel;
+                        startUlevelInput.appendChild(startOpt);
+
+                        const endOpt = document.createElement("option");
+                        endOpt.value = ulevel;
+                        endOpt.textContent = ulevel;
+                        endUlevelInput.appendChild(endOpt);
+                    });
+                    startUlevelInput.disabled = false;
+                    endUlevelInput.disabled = false;
+                } else {
+                    startUlevelInput.disabled = true;
+                    endUlevelInput.disabled = true;
                 }
             });
-        } else {
-            // No tool hits – display LLM answer with feedback
-            const message = data.message || "No response available.";
+        }
+
+        function validateUpdateLevels() {
+            const start = parseInt(document.getElementById("start-u-level").value);
+            const end = parseInt(document.getElementById("end-u-level").value);
+            if (isNaN(start) || isNaN(end)) return false;
+            if (start > end) {
+                alert("Start U-Level must be less than or equal to End U-Level");
+                return false;
+            }
+            return true;
+        }
+
+        document.addEventListener("DOMContentLoaded", loadProductVersions);
+
+        function renderMessage(message, chatBox, conversationId) {
             const encodedDescription = message.replace(/'/g, "\\'").replace(/"/g, "&quot;");
 
             const bubbleWrapper = document.createElement("div");
@@ -559,93 +774,91 @@
             bubbleWrapper.appendChild(bubbleDiv);
             chatBox.appendChild(bubbleWrapper);
         }
-    } catch (err) {
-        clearInterval(interval);
-        typingBubble.remove();
-        const errBubble = document.createElement("div");
-        errBubble.className = "chat-bubble bot";
-        const errInner = document.createElement("div");
-        errInner.className = "bubble text-danger";
-        errInner.textContent = "Oops, something went wrong.";
-        errBubble.appendChild(errInner);
-        chatBox.appendChild(errBubble);
-        console.error(err);
-    }
 
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
+        function renderToolHits(hits, chatBox) {
+            hits.forEach((hit, index) => {
+                if (hit.tool && hit.results) {
+                    // For each tool, create one chat bubble
+                    const botBubble = document.createElement("div");
+                    botBubble.className = "chat-bubble bot";
+                    const bubbleInner = document.createElement("div");
+                    bubbleInner.className = "bubble";
 
+                    // Tool name as a header
+                    const toolHeader = document.createElement("h5");
+                    toolHeader.className = "mb-2";
+                    toolHeader.textContent = `Tool: ${hit.tool}`;
+                    bubbleInner.appendChild(toolHeader);
 
-        function startNewChat() {
-            const newWindow = window.open("./", "_blank");
-        }
+                    // Horizontal row of cards for each result
+                    const resultsRow = document.createElement("div");
+                    resultsRow.className = "tool-results-row";
 
-        function logout() {
-            fetch("./logout", {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json"
-                }
-            })
-            .then(res => {
-                if (res.redirected) {
-                    window.location.href = res.url;
-                } else if (res.ok) {
-                    window.location.href = "./login";
+                    hit.results.forEach((result, idx) => {
+                        const toolDivId = `tool-result-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                        const card = document.createElement("div");
+                        card.className = "tool-card card mb-2";
+                        card.id = toolDivId;
+                        resultsRow.appendChild(card);
+
+                        setTimeout(() => {
+                            renderToolResults({
+                                tool: hit.tool,
+                                results: [result] // one result per card
+                            }, toolDivId);
+                        }, 0);
+                    });
+
+                    bubbleInner.appendChild(resultsRow);
+                    botBubble.appendChild(bubbleInner);
+                    chatBox.appendChild(botBubble);
                 } else {
-                    console.error("Logout failed:", res.status);
+                    // fallback for unknown hit
+                    const botBubble = document.createElement("div");
+                    botBubble.className = "chat-bubble bot";
+                    const bubbleInner = document.createElement("div");
+                    bubbleInner.className = "bubble";
+                    const fallbackCard = document.createElement("div");
+                    fallbackCard.className = "tool-card card mb-2";
+                    fallbackCard.innerHTML = `<pre style="white-space: pre-wrap;">${JSON.stringify(hit, null, 2)}</pre>`;
+                    bubbleInner.appendChild(fallbackCard);
+                    botBubble.appendChild(bubbleInner);
+                    chatBox.appendChild(botBubble);
                 }
-            })
-            .catch(err => {
-                console.error("Logout error:", err);
             });
         }
 
-        let productVersionMap = {};
-
-        async function loadProductVersions() {
-            const res = await fetch("./product-versions");
-            const data = await res.json();
-
-            // console.log("Received data:", data);
-
-            const productSelect = document.getElementById("product-select");
-            const versionSelect = document.getElementById("version-select");
-
-            productSelect.innerHTML = '<option selected disabled>Select a product</option>';
-            versionSelect.innerHTML = '<option selected disabled>Select a version</option>';
-            productSelect.disabled = false;
-
-            const productVersionMap = {};
-
-            // Build dropdown and lookup map
-            data.forEach(entry => {
-                productVersionMap[entry.product] = entry.versions;
-                entry.versions.sort((a, b) =>
-                    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-                );
-                const opt = document.createElement("option");
-                opt.value = entry.product;
-                opt.textContent = entry.product;
-                productSelect.appendChild(opt);
+        function createFeedbackButtons(container, conversationId, toolName, feedbackId, encodedDescription) {
+            // Helper to create and append feedback buttons
+            const btnYes = document.createElement("button");
+            btnYes.textContent = "👍 Related";
+            btnYes.className = "btn btn-sm btn-outline-success me-2";
+            btnYes.addEventListener("click", function () {
+                markAsRelated(conversationId, toolName, feedbackId, encodedDescription, true, btnYes);
             });
 
-            // Handle product selection to update versions
-            productSelect.addEventListener("change", () => {
-                const selectedProduct = productSelect.value;
-                const versions = productVersionMap[selectedProduct] || [];
-
-                versionSelect.innerHTML = '<option selected disabled>Select a version</option>';
-                versions.forEach(version => {
-                    const opt = document.createElement("option");
-                    opt.value = version;
-                    opt.textContent = version;
-                    versionSelect.appendChild(opt);
-                });
+            const btnNo = document.createElement("button");
+            btnNo.textContent = "👎 Not Related";
+            btnNo.className = "btn btn-sm btn-outline-danger";
+            btnNo.addEventListener("click", function () {
+                markAsRelated(conversationId, toolName, feedbackId, encodedDescription, false, btnNo);
             });
+
+            container.appendChild(btnYes);
+            container.appendChild(btnNo);
         }
 
-        document.addEventListener("DOMContentLoaded", loadProductVersions);
+        function renderCard(container, htmlContent, feedbackId, toolName, encodedDescription, conversationId, feedbackIdx) {
+            // Helper to create a card and append feedback buttons if needed
+            container.innerHTML = htmlContent;
+
+            if (feedbackId && conversationId) {
+                const feedbackContainer = container.querySelector(`#feedback-${toolName}-${feedbackIdx}`);
+                if (feedbackContainer) {
+                    createFeedbackButtons(feedbackContainer, conversationId, toolName, feedbackId, encodedDescription);
+                }
+            }
+        }
 
         function renderToolResults(responseData, containerId) {
             const container = document.getElementById(containerId);
@@ -661,137 +874,71 @@
             const toolName = responseData.tool;
             const results = responseData.results;
 
-            if (toolName == "u2_update_summary") {
-                const toolHeader = document.createElement("h4");
-                toolHeader.textContent = `Tool: ${toolName}`;
-                container.appendChild(toolHeader);
+            // Common error display helper
+            const showError = (msg) => {
+                const errorDiv = document.createElement("div");
+                errorDiv.className = "alert alert-danger";
+                errorDiv.textContent = msg;
+                container.appendChild(errorDiv);
+            };
 
-                if (results.length <= 0) {
-                    container.innerHTML = `<p class='text-info'>No related issues found.</p>`;
+            // General empty results handler
+            if (results.length === 0) {
+                container.innerHTML = `<p class='text-info'>No related issues found.</p>`;
+                return;
+            }
+
+            results.forEach((entry, index) => {
+                if (entry.error) {
+                    showError(toolName === "u2_update_summary"
+                        ? "Error occurred while searching Update Summary"
+                        : "Error occurred while fetching GitHub issues.");
                     return;
                 }
 
-                results.forEach((entry, index) => {
-                    console.log("Rendering entry:", entry);
+                let htmlContent = "";
+                let feedbackId = null, encodedDescription = null;
 
-                    if (!entry.error) {
-                        const feedbackId = `${entry["product-name"]}-${entry["product-version"]}-${entry["update-level"]}-${entry["update-number"]}`;
-                        const encodedDescription = entry.description.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                        
-                        // let relatedDivId = `related-issues-${toolName}-${index}`;
-                        const card = document.createElement("div");
-                        card.className = "card mb-3";
-                        card.innerHTML = `
-                            <div class="card-body">
-                                <h5 class="card-title">Update #${entry["update-number"]} (Level ${entry["update-level"]})</h5>
-                                <h6 class="card-title">Product :${entry["product-name"]} (Version ${entry["product-version"]})</h6>
-                                <p class="card-text"><strong>Description:</strong><br>${(entry.description || "").replace(/\n/g, "<br>")}</p>
-                                <div><strong>Related Issues:</strong><br>
-                                    <div>${renderRelatedIssues(entry["bug-fixes"])}</div>
-                                </div>
-                                <div class="mt-2" id="feedback-${toolName}-${index}">
-                                    <!-- Buttons inserted here -->
-                                </div>
+                if (toolName === "u2_update_summary") {
+                    feedbackId = `${entry["product-name"]}-${entry["product-version"]}-${entry["update-level"]}-${entry["update-number"]}`;
+                    encodedDescription = (entry.description || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                    htmlContent = `
+                        <div class="card-body">
+                            <h5 class="card-title">Update #${entry["update-number"]} (Level ${entry["update-level"]})</h5>
+                            <h6 class="card-title">Product :${entry["product-name"]} (Version ${entry["product-version"]})</h6>
+                            <p class="card-text"><strong>Description:</strong><br>${(entry.description || "").replace(/\n/g, "<br>")}</p>
+                            <div><strong>Related Issues:</strong><br>
+                                <div>${renderRelatedIssues(entry["bug-fixes"])}</div>
                             </div>
-                        `;
-                        container.appendChild(card);
-                        // const relatedList = renderRelatedIssues(entry["bug-fixes"]);
-                        // document.getElementById(relatedDivId).appendChild(relatedList);
-
-                        const feedbackContainer = card.querySelector(`#feedback-${toolName}-${index}`);
-
-                        const btnYes = document.createElement("button");
-                        btnYes.textContent = "👍 Related";
-                        btnYes.className = "btn btn-sm btn-outline-success me-2";
-                        btnYes.addEventListener("click", function () {
-                            markAsRelated(conversationId, toolName, feedbackId, encodedDescription, true, btnYes);
-                        });
-
-                        const btnNo = document.createElement("button");
-                        btnNo.textContent = "👎 Not Related";
-                        btnNo.className = "btn btn-sm btn-outline-danger";
-                        btnNo.addEventListener("click", function () {
-                            markAsRelated(conversationId, toolName, feedbackId, encodedDescription, false, btnNo);
-                        });
-
-                        feedbackContainer.appendChild(btnYes);
-                        feedbackContainer.appendChild(btnNo);
-                    } else {
-                        const errorDiv = document.createElement("div");
-                        errorDiv.className = "alert alert-danger";
-                        errorDiv.textContent = `Error occured while searching Update Summary`;
-                        container.appendChild(errorDiv);
-                    }
-                });
-            } else if (toolName == "github_find_related_issues") {
-
-                const toolHeader = document.createElement("h4");
-                toolHeader.textContent = `Tool: ${toolName}`;
-                container.appendChild(toolHeader);
-
-                if (results.length <= 0) {
-                    container.innerHTML = `<p class='text-info'>No related issues found.</p>`;
-                    return;
-                }
-
-                results.forEach((issue, index) => {
-                    if (!issue.error) {
-                        console.log(issue);
-
-                        const feedbackId = `${issue["url"]}-${issue["title"]}`;
-                        const encodedDescription = issue.body.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-
-                        const card = document.createElement("div");
-                        card.className = "card mb-3";
-                        card.innerHTML = `
-                            <div class="card-body">
-                            <h5 class="card-title">
-                                <a href="${issue.url}" target="_blank">${issue.title}</a>
-                            </h5>
-                            <!-- this div will host the rendered Markdown -->
-                            <div id="issue-body-${containerId}-${index}" class="markdown-body">${renderMarkdownContent(issue.body)}                            </div>
                             <div class="mt-2" id="feedback-${toolName}-${index}">
                                 <!-- Buttons inserted here -->
                             </div>
+                        </div>
+                    `;
+                } else if (toolName === "github_find_related_issues") {
+                    feedbackId = `${entry["url"]}-${entry["title"]}`;
+                    encodedDescription = (entry.body || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                    htmlContent = `
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <a href="${entry.url}" target="_blank">${entry.title}</a>
+                            </h5>
+                            <div id="issue-body-${containerId}-${index}" class="markdown-body">
+                                ${renderMarkdownContent(entry.body)}
                             </div>
-                        `;
-                        container.appendChild(card);
+                            <div class="mt-2" id="feedback-${toolName}-${index}">
+                                <!-- Buttons inserted here -->
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    htmlContent = `<h4>${toolName}</h4>`;
+                }
 
-                        const feedbackContainer = card.querySelector(`#feedback-${toolName}-${index}`);
-
-                        const btnYes = document.createElement("button");
-                        btnYes.textContent = "👍 Related";
-                        btnYes.className = "btn btn-sm btn-outline-success me-2";
-                        btnYes.addEventListener("click", function () {
-                            markAsRelated(conversationId, toolName, feedbackId, encodedDescription, true, btnYes);
-                        });
-
-                        const btnNo = document.createElement("button");
-                        btnNo.textContent = "👎 Not Related";
-                        btnNo.className = "btn btn-sm btn-outline-danger";
-                        btnNo.addEventListener("click", function () {
-                            markAsRelated(conversationId, toolName, feedbackId, encodedDescription, false, btnNo);
-                        });
-
-                        feedbackContainer.appendChild(btnYes);
-                        feedbackContainer.appendChild(btnNo);
-
-                        // Now render the issue.body as GitHub-flavored Markdown
-                        // const mdContainer = document.getElementById(`issue-body-${containerId}-${idx}`);
-                    } else {
-                        const errorDiv = document.createElement("div");
-                        errorDiv.className = "alert alert-danger";
-                        errorDiv.textContent = `Error occurred while fetching GitHub issues.`;
-                        container.appendChild(errorDiv);
-                    }
-                });
-            
-            } else {
-                container.innerHTML = `<h4>${toolName}</h4>`;
-            }
-
-            
+                renderCard(container, htmlContent, feedbackId, toolName, encodedDescription, conversationId, index);
+            });
         }
+
 
         function renderRelatedIssues(bugFixesRaw) {
             let rawArray;
