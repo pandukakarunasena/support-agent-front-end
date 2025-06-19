@@ -536,5 +536,21 @@ def feedback_endpoint():
         logger.exception("Failed to log feedback")
         return jsonify({"error": "Failed to log feedback"}), 500
 
+@app.after_request
+def apply_csp(response):
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src-elem 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com www.google.com www.gstatic.com; "
+        "style-src-elem 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com fonts.googleapis.com; "
+        "font-src 'self' fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+    return response
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
