@@ -30,6 +30,9 @@ from flask import make_response
 
 # ─────────────────────────────── CONFIG ───────────────────────────────
 
+app = Flask(__name__)
+CORS(app)
+
 # Logging setup
 LOG_FILE = "logs/app.log"
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -54,6 +57,8 @@ if os.getenv("ENVIRONMENT") == "development-choreo":
 else:
     MCP_SERVER_URL = f"http://{os.getenv('MCP_SERVER_HOST_LOCAL', 'localhost')}:{os.getenv('MCP_SERVER_PORT_LOCAL', '9999')}"
     BASE_PATH = ""
+
+app.config['BASE_PATH'] = os.getenv('BASE_PATH', '')  # e.g., "/myapp"
 
 if not OPENAI_KEY:
     raise RuntimeError("Missing OPENAI_API_KEY in environment")
@@ -135,9 +140,6 @@ class Session:
 sessions: Dict[str, Session] = {}
 
 # ─────────────────────────────── FLASK APP ───────────────────────────────
-
-app = Flask(__name__)
-CORS(app)
 
 def hash_entry(entry):
     """Create a hash for a given hit result (based on JSON content)."""

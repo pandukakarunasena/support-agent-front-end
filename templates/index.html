@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>AI Chat Assistant</title>s
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/github-markdown.min.css') }}">
+    <link rel="stylesheet" href= "{{ config['BASE_PATH'] }}{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href= "{{ config['BASE_PATH'] }}{{ url_for('static', filename='css/github-markdown.min.css') }}">
     
     <script src="{{ url_for('static', filename='scripts/marked.min.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/purify.min.js') }}"></script>
