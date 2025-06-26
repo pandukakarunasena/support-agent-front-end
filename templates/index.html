@@ -6,8 +6,8 @@
     <link rel="stylesheet" href= "{{ config['BASE_PATH'] }}{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href= "{{ config['BASE_PATH'] }}{{ url_for('static', filename='css/github-markdown.min.css') }}">
     
-    <script src="{{ url_for('static', filename='scripts/marked.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/purify.min.js') }}"></script>
+    <script src="{{ config['BASE_PATH'] }}{{ url_for('static', filename='scripts/marked.min.js') }}"></script>
+    <script src="{{ config['BASE_PATH'] }}{{ url_for('static', filename='scripts/purify.min.js') }}"></script>
     
     <style>
         /* ── WSO2 Brand Color Variables ───────────────────────────────────────── */
